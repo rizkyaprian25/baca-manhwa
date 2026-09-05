@@ -15,7 +15,7 @@
 
 ## 2. ATURAN MUTLAK: Wajib Update PRD.md Tiap Selesai Fase
 
-> **PERINTAH MUTLAK UNTUK AI:** Setiap selesai SATU FASE (Fase 0-23 di `PRD.md` §16 Roadmap), AI **WAJIB** update `PRD.md` sebelum menyatakan fase selesai. **Dilarang skip.**
+> **PERINTAH MUTLAK UNTUK AI:** Setiap selesai SATU FASE (Fase 0-25 di `PRD.md` §16 Roadmap), AI **WAJIB** update `PRD.md` sebelum menyatakan fase selesai. **Dilarang skip.**
 
 ### Trigger
 - Selesai Fase N (sesuai Roadmap §16)

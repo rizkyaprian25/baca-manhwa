@@ -66,26 +66,34 @@ class KomikuRepositoryImpl implements MangaRepository {
   }) async {
     final page = offset ~/ KomikuApi.pageSize + 1;
     final isTitleSearch = filter.title.trim().isNotEmpty;
-    final List<Manga> raw;
     if (isTitleSearch) {
-      raw = await remote.searchPage(filter.title.trim(), page: page);
-    } else {
-      raw = await remote.listPage(
-        orderby: _order(filter.order),
-        genre: filter.includedTags.isEmpty ? null : filter.includedTags.first,
-        status: _status(filter.status),
-        page: page,
-      );
+      // Search: kumpulkan SEMUA yang cocok (maks 3 halaman mentah, ~30
+      // hasil) karena server mencampur hasil tak-relevan (cocok sinopsis).
+      // hasMore=false — semua sudah ditampilkan sekaligus.
+      final q = filter.title.trim();
+      final seen = <String>{};
+      final all = <Manga>[];
+      for (var p = 1; p <= 3; p++) {
+        final raw = await remote.searchPage(q, page: p);
+        if (raw.isEmpty) break;
+        for (final m in raw) {
+          if (seen.add(m.id) && k.titleMatchesQuery(m.title, q)) {
+            all.add(m);
+          }
+        }
+        if (raw.length < KomikuApi.pageSize) break;
+      }
+      await db.upsertMangas(all.map(mangaToCompanion).toList());
+      return MangaPage(items: all, total: all.length, hasMore: false);
     }
-    // Search server cocokkan sinopsis juga — saring ke judul yang
-    // benar-benar mengandung kata kunci (aturan: kata utuh).
-    final items = isTitleSearch
-        ? raw
-            .where((m) => k.titleMatchesQuery(m.title, filter.title))
-            .toList()
-        : raw;
+    final List<Manga> items = await remote.listPage(
+      orderby: _order(filter.order),
+      genre: filter.includedTags.isEmpty ? null : filter.includedTags.first,
+      status: _status(filter.status),
+      page: page,
+    );
     await db.upsertMangas(items.map(mangaToCompanion).toList());
-    final hasMore = raw.length >= KomikuApi.pageSize;
+    final hasMore = items.length >= KomikuApi.pageSize;
     return MangaPage(
       items: items,
       total: offset + items.length + (hasMore ? KomikuApi.pageSize : 0),

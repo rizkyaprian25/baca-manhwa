@@ -5,8 +5,10 @@
 - **Lokasi proyek:** `E:\Mobile\baca manhwa`
 - **Versi app:** `1.0.0+1` — `pubspec.yaml:4`
 - **SDK:** `^3.12.2` — `pubspec.yaml:22` — Flutter 3.44.4 / Dart 3.12.2
-- **Status baseline:** SEMUA FASE SELESAI (Fase 0-23). APK Baca Manhwa tersedia. Smoke test di HP fisik oleh user.
+- **Status baseline:** SEMUA FASE SELESAI (Fase 0-25). APK Baca Manhwa tersedia. Smoke test di HP fisik oleh user.
 - **Tanggal:** 2026-09-05
+- **Update terakhir Fase 25:** 2026-09-05 — Hapus penanda milestone tiap 10 halaman di reader (mengganggu) — `analyze` 0 issues, `test` 31/31
+- **Update terakhir Fase 24:** 2026-09-05 — Jelajah diperbaiki: search sapu 3 halaman, state selalu segar, field netral, grid 3 kolom + tombol muat — `analyze` 0 issues, `test` 31/31
 - **Update terakhir Fase 23:** 2026-09-05 — Infinite scroll di Beranda (scroll mentok muat lagi via `updatesProvider`, dedupe + stop otomatis) — `analyze` 0 issues, `test` 31/31
 - **Update terakhir Fase 22:** 2026-09-05 — Beranda tampil 20 update (fetch limit 20 + grid tanpa batas 4) — `analyze` 0 issues, `test` 31/31
 - **Update terakhir Fase 21:** 2026-09-05 — Implementasi setia panduan KuroYomi dark (default gelap migrasi v5, nav fixed+label, Home search/pill/spotlight/lanjut/grid, CTA gradien, Reader jam/bookmark/milestone, sheet panduan) — `analyze` 0 issues, `test` 31/31
@@ -405,6 +407,8 @@ tool/smoke_api.dart (skrip verifikasi live, butuh network tak-terblokir)
 - [x] **Fase 21 — Panduan KuroYomi Setia — SELESAI (2026-09-05):** dark default + nav fixed + Home/Detail/Reader/Library panduan, `analyze` 0 issues, `test` 31/31, `build web` + APK
 - [x] **Fase 22 — 20 Update di Beranda — SELESAI (2026-09-05):** fetch 20 + tampil semua, `analyze` 0 issues, `test` 31/31
 - [x] **Fase 23 — Infinite Scroll Beranda — SELESAI (2026-09-05):** scroll mentok muat lagi + stop otomatis, `analyze` 0 issues, `test` 31/31
+- [x] **Fase 24 — Jelajah Diperbaiki — SELESAI (2026-09-05):** hasil penuh + fresh + field netral + grid 3 kol, `analyze` 0 issues, `test` 31/31
+- [x] **Fase 25 — Hapus Milestone Reader — SELESAI (2026-09-05):** cabut penanda tiap 10 halaman, `analyze` 0 issues, `test` 31/31
 - [x] Error view informatif (offline, 429, 5xx) + `flutter analyze` 0 error + `flutter test` hijau + `flutter build apk --release` sukses <40MB
 - [x] Legal: catatan pribadi + patuh ToS & rate limit MangaDex, tanpa credential hardcode
 
@@ -453,6 +457,8 @@ tool/smoke_api.dart (skrip verifikasi live, butuh network tak-terblokir)
 **Fase 21 — Panduan KuroYomi Setia — SELESAI (2026-09-05):** permintaan user — terapkan SEMUA aspek panduan dark + fitur tetap. Implementasi: (1) tema gelap default — seed `theme dark` + migrasi v5 (`UPDATE ... WHERE theme='system'`), AppBar gelap; terang biru tetap opsi; (2) nav fixed 5 label + badge (ganti pil mengambang Fase 20); (3) Home: search bar + tune, pill genre single-select, spotlight 16:10 (badge SPOTLIGHT#1 + rating + tags + CTA gradien→detail + bookmark), Lanjut Baca kartu progres guide + Semua Riwayat, grid Update 2 kolom (badge ID + Ch + waktu + stat rating/pembaca) + tombol muat + status; (4) Detail CTA gradien; (5) Reader: jam live HUD, tombol bookmark simpan posisi, milestone tiap 10 halaman; (6) Library sheet = Lanjutkan/Unduh-5/Favorit/Selesai/Hapus + `removeFromAll`. Nama tetap "Baca Manhwa". Verifikasi: `analyze` 0 issues, `test` 31/31, `build web` + APK.
 **Fase 22 — 20 Update di Beranda — SELESAI (2026-09-05):** laporan user — Beranda cuma tampil ~10 (aneh, di search banyak). Akar: fetch `latestUpdates` limit 12 + grid dibatasi `clamp(0, 4)`. Perbaikan: limit 20 (Komiku = 2 halaman × 10; MangaDex 1 request) + grid tampil semua. Verifikasi: `analyze` 0 issues, `test` 31/31.
 **Fase 23 — Infinite Scroll Beranda — SELESAI (2026-09-05):** permintaan user — "scroll mentok muncul lebih banyak". Implementasi: `latestUpdatesProvider` (sekali fetch) diganti `updatesProvider` (`UpdatesNotifier`: halaman 10 via `search` order terbaru + `loadMore` saat scroll <600px dari dasar + pull-refresh muat ulang + fallback cache offline di awal) + `mergeSearchPage` pindah ke shared providers (dipakai search juga). Stop otomatis bila halaman tak penuh / tak ada item baru (dedupe per id). Verifikasi: `analyze` 0 issues, `test` 31/31.
+**Fase 24 — Jelajah Diperbaiki — SELESAI (2026-09-05):** keluhan user — (1) hasil sedikit, (2) query lama "nempel" aneh, (3) field biru tak nyaman. Perbaikan: (1) title-search Komiku menyapu maks 3 halaman mentah (~30 hasil, dedupe per id, cocok kata-utuh) sekaligus + `hasMore=false`; browse tetap infinite; threshold scroll 800px + tombol "Muat lebih banyak"; grid 3 kolom (maxExtent 120); (2) buka Jelajah baru tanpa query selalu reset judul (state segar); (3) field netral ikut tema (tidak paksa putih-biru). Verifikasi: `analyze` 0 issues, `test` 31/31.
+**Fase 25 — Hapus Milestone Reader — SELESAI (2026-09-05):** permintaan user — penanda "Halaman X dari N" tiap 10 halaman di reader mengganggu. Perbaikan: cabut `_milestone` + pemanggilnya (item vertikal kembali langsung gambar). Verifikasi: `analyze` 0 issues, `test` 31/31.
 
 ---
 
@@ -494,7 +500,7 @@ Tokens warna awal (final di `app_colors.dart` Fase 1): `primary #6750A4`, `surfa
 
 ## 19. Aturan Wajib AI — Update PRD Tiap Selesai Fase
 
-> **PERINTAH MUTLAK UNTUK AI (Muse Spark / opencode):** Setiap selesai **SATU FASE** (Fase 0-23 di §16 Roadmap), AI **WAJIB** update `PRD.md` sebelum menyatakan fase selesai. **Dilarang skip. Dilarang klaim "fase selesai" tanpa PRD ter-update.**
+> **PERINTAH MUTLAK UNTUK AI (Muse Spark / opencode):** Setiap selesai **SATU FASE** (Fase 0-25 di §16 Roadmap), AI **WAJIB** update `PRD.md` sebelum menyatakan fase selesai. **Dilarang skip. Dilarang klaim "fase selesai" tanpa PRD ter-update.**
 
 ### Trigger
 - AI menilai deliverable `Fase N` tercapai, ATAU

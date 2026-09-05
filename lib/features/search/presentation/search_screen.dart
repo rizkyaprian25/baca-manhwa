@@ -30,13 +30,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    // Mode jelajah: langsung tampilkan update terbaru.
+    // Mode jelajah: tampilkan update terbaru, selalu mulai segar kecuali
+    // dibuka dengan query awal (mis. dari Beranda).
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final notifier = ref.read(searchFilterProvider.notifier);
       if (widget.initialQuery.isNotEmpty) {
         _searchCtrl.text = widget.initialQuery;
-        ref
-            .read(searchFilterProvider.notifier)
-            .setTitle(widget.initialQuery);
+        notifier.setTitle(widget.initialQuery);
+      } else if (ref.read(searchFilterProvider).title.isNotEmpty) {
+        _searchCtrl.clear();
+        notifier.setTitle('');
+        setState(() {});
       }
       ref.read(searchResultsProvider.notifier).search();
     });
@@ -52,7 +56,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onScroll() {
     if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 400) {
+        _scrollCtrl.position.maxScrollExtent - 800) {
       ref.read(searchResultsProvider.notifier).loadMore();
     }
   }
@@ -83,18 +87,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
               child: TextField(
                 controller: _searchCtrl,
-                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   hintText: 'Cari komik...',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                  prefixIcon:
-                      const Icon(Icons.search, color: Colors.white),
+                  prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchCtrl.text.isEmpty
                       ? null
                       : IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.white),
+                          icon: const Icon(Icons.clear),
                           onPressed: () {
                             _searchCtrl.clear();
                             ref
@@ -106,7 +105,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         ),
                   filled: true,
                   fillColor:
-                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.surfaceContainerHigh,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(28),
                     borderSide: BorderSide.none,
@@ -212,7 +211,7 @@ class _Results extends ConsumerWidget {
               childCount: results.items.length,
             ),
             gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 160,
+              maxCrossAxisExtent: 120,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
               childAspectRatio: isKomiku ? 1.15 : 0.5,
@@ -224,6 +223,19 @@ class _Results extends ConsumerWidget {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+        if (!results.isLoadingMore && results.hasMore)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.expand_more),
+                label: const Text('Muat lebih banyak'),
+                onPressed: () => ref
+                    .read(searchResultsProvider.notifier)
+                    .loadMore(),
+              ),
             ),
           ),
         if (!results.isLoadingMore && !results.hasMore)

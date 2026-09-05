@@ -793,51 +793,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             final url = atHome.pageUrl(i, dataSaver: saver);
             final local = _localPathFor(localPaths, i);
             final key = _keys.putIfAbsent(i, () => GlobalKey());
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  key: key,
-                  onDoubleTap: () => _openZoom(url, local),
-                  child: ReaderPageImage(
-                    url: url,
-                    localPath: local,
-                    onRetry: () => setState(() {}),
-                  ),
-                ),
-                if ((i + 1) % 10 == 0 && i < atHome.pageCount - 1)
-                  _milestone(i),
-              ],
+            return GestureDetector(
+              key: key,
+              onDoubleTap: () => _openZoom(url, local),
+              child: ReaderPageImage(
+                url: url,
+                localPath: local,
+                onRetry: () => setState(() {}),
+              ),
             );
           },
         ),
-      ),
-    );
-  }
-
-  /// Penanda "Halaman X dari N" tiap 10 halaman (ala panduan).
-  Widget _milestone(int i) {
-    final scheme = Theme.of(context).colorScheme;
-    final line = Expanded(
-      child: Divider(color: scheme.outline.withValues(alpha: 0.4)),
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          line,
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              'Halaman ${i + 1} dari $_total',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.outline,
-                    letterSpacing: 2,
-                  ),
-            ),
-          ),
-          line,
-        ],
       ),
     );
   }
