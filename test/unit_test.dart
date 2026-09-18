@@ -220,4 +220,21 @@ void main() {
     expect(titleMatchesQuery('Apapun', ''), true);
     expect(titleMatchesQuery('Apapun', 'a'), true);
   });
+
+  test('komikuStatusMatches: ongoing vs tamat', () {
+    expect(komikuStatusMatches('Ongoing', 'ongoing'), true);
+    expect(komikuStatusMatches('ongoing', 'end'), false);
+    expect(komikuStatusMatches('Tamat', 'end'), true);
+    expect(komikuStatusMatches('Completed', 'end'), true);
+    expect(komikuStatusMatches(null, 'ongoing'), false);
+    expect(komikuStatusMatches('', 'end'), false);
+  });
+
+  test('searchStatusesFor: komiku tanpa hiatus', () {
+    expect(
+      searchStatusesFor('komiku').map((o) => o.$1),
+      ['', 'ongoing', 'completed'],
+    );
+    expect(searchStatusesFor('mangadex').length, 4);
+  });
 }

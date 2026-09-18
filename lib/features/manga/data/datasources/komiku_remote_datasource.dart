@@ -21,14 +21,18 @@ class KomikuRemoteDataSource {
 
   Future<List<Manga>> listPage({
     String orderby = 'modified',
+    String? sorttime,
     String? genre,
+    String? genre2,
     String? status,
     int page = 1,
   }) =>
       _guard(() async {
         final html = await _api.listPage(
           orderby: orderby,
+          sorttime: sorttime,
           genre: genre,
+          genre2: genre2,
           status: status,
           page: page,
         );

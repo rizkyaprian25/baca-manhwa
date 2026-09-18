@@ -33,11 +33,53 @@ bool titleMatchesQuery(String title, String query) {
   );
 }
 
+/// Status detail cocok dengan filter? `wanted`: 'ongoing' | 'end'.
+/// Server mengabaikan param status, jadi verifikasi dilakukan dari
+/// halaman detail (satu-satunya sumber benar).
+bool komikuStatusMatches(String? actual, String wanted) {
+  final s = (actual ?? '').toLowerCase();
+  if (wanted == 'ongoing') return s.contains('ongoing');
+  if (wanted == 'end') {
+    return s.contains('tamat') ||
+        s.contains('complet') ||
+        s == 'end' ||
+        s.contains('finish');
+  }
+  return false;
+}
+
 /// "59-5" -> "59.5", selainnya apa adanya.
 String prettifyChapter(String raw) {
   final s = raw.trim();
   if (RegExp(r'^\d+-\d+$').hasMatch(s)) return s.replaceFirst('-', '.');
   return s;
+}
+
+/// "18 menit lalu" -> menit sejak update (untuk urut Terbaru sejati).
+/// Format tak dikenal -> null (diurut paling belakang). Jujur: hanya
+/// menafsirkan pola relatif Indonesia yang umum di `.judul2` Komiku.
+int? parseUpdateAgoMinutes(String? ago) {
+  final s = (ago ?? '').toLowerCase().trim();
+  if (s.isEmpty) return null;
+  if (s.contains('baru') ||
+      s.contains('sekarang') ||
+      s.contains('detik')) {
+    return 0;
+  }
+  if (s.contains('kemarin')) return 1440;
+  final m = RegExp(r'(\d+)\s*(menit|jam|hari|minggu|bulan|tahun)')
+      .firstMatch(s);
+  if (m == null) return null;
+  final n = int.tryParse(m.group(1)!) ?? 0;
+  return switch (m.group(2)) {
+    'menit' => n,
+    'jam' => n * 60,
+    'hari' => n * 1440,
+    'minggu' => n * 10080,
+    'bulan' => n * 43200,
+    'tahun' => n * 525600,
+    _ => null,
+  };
 }
 
 int? parseReaders(String meta) {

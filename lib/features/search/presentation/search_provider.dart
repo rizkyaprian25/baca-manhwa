@@ -31,6 +31,13 @@ const searchStatusOptions = [
   ('hiatus', 'Hiatus'),
 ];
 
+/// Opsi status per sumber (Komiku tak kenal hiatus → disembunyikan;
+/// Tamat/Ongoing diverifikasi via detail).
+List<(String, String)> searchStatusesFor(String source) =>
+    source == 'komiku'
+        ? const [('', 'Semua'), ('ongoing', 'Ongoing'), ('completed', 'Tamat')]
+        : searchStatusOptions;
+
 /// State filter pencarian — `lib/features/search/presentation/search_provider.dart`.
 class MangaFilterNotifier extends Notifier<MangaFilter> {
   @override
@@ -129,25 +136,32 @@ class SearchState {
       );
 }
 
-/// Hasil pencarian + infinite scroll (limit 20).
+/// Hasil pencarian + infinite scroll (10 per muat).
 /// Gabung halaman via `mergeSearchPage` bersama (manga_providers).
 class SearchResultsNotifier extends Notifier<SearchState> {
+  /// Generasi request: respons basi (mis. search lama yang selesai belakangan
+  /// menimpa hasil search baru) dibuang — anti "nempel"/hasil salah.
+  int _gen = 0;
+
   @override
   SearchState build() => const SearchState();
 
   Future<void> search() async {
+    final myGen = ++_gen;
     final filter = ref.read(searchFilterProvider);
     state = const SearchState(isLoading: true);
     try {
       final page = await ref
           .read(mangaRepositoryProvider)
-          .search(filter, limit: 20);
+          .search(filter, limit: 10);
+      if (myGen != _gen) return;
       state = SearchState(
         items: page.items,
         total: page.total,
         hasMore: page.hasMore,
       );
     } catch (e) {
+      if (myGen != _gen) return;
       state = SearchState(error: e);
     }
   }
@@ -157,13 +171,16 @@ class SearchResultsNotifier extends Notifier<SearchState> {
     if (s.isLoading || s.isLoadingMore || !s.hasMore || s.error != null) {
       return;
     }
+    final myGen = ++_gen;
+    final filter = ref.read(searchFilterProvider);
     state = s.copyWith(isLoadingMore: true);
     try {
       final page = await ref.read(mangaRepositoryProvider).search(
-            ref.read(searchFilterProvider),
-            limit: 20,
+            filter,
+            limit: 10,
             offset: s.items.length,
           );
+      if (myGen != _gen) return;
       final merged = mergeSearchPage(s.items, page);
       state = s.copyWith(
         items: merged.items,
@@ -172,6 +189,7 @@ class SearchResultsNotifier extends Notifier<SearchState> {
         isLoadingMore: false,
       );
     } catch (_) {
+      if (myGen != _gen) return;
       // List lama dipertahankan; scroll berikutnya bisa retry.
       state = s.copyWith(isLoadingMore: false);
     }

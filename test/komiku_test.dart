@@ -66,4 +66,19 @@ void main() {
       'song-baek-chapter-89',
     );
   });
+
+  test('helper: parseUpdateAgoMinutes', () {
+    expect(parseUpdateAgoMinutes('18 menit lalu'), 18);
+    expect(parseUpdateAgoMinutes('2 jam lalu'), 120);
+    expect(parseUpdateAgoMinutes('3 hari lalu'), 4320);
+    expect(parseUpdateAgoMinutes('1 minggu lalu'), 10080);
+    expect(parseUpdateAgoMinutes('2 bulan lalu'), 86400);
+    expect(parseUpdateAgoMinutes('1 tahun lalu'), 525600);
+    expect(parseUpdateAgoMinutes('baru saja'), 0);
+    expect(parseUpdateAgoMinutes('45 detik lalu'), 0);
+    expect(parseUpdateAgoMinutes('kemarin'), 1440);
+    expect(parseUpdateAgoMinutes(null), isNull);
+    expect(parseUpdateAgoMinutes(''), isNull);
+    expect(parseUpdateAgoMinutes('segera'), isNull);
+  });
 }

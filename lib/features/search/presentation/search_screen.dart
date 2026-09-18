@@ -74,6 +74,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final filter = ref.watch(searchFilterProvider);
+    // Satu filter dipakai bersama (tab Jelajah + rute /search dari Beranda):
+    // bila judul di provider berubah dari tempat lain (mis. layar Jelajah
+    // lain me-reset), sinkronkan kotak teks agar tak "nempel" teks basi.
+    // Aman di build: set programatik tak memicu onChanged, spasi akhir
+    // saat mengetik diabaikan via trim.
+    if (_searchCtrl.text.trim() != filter.title) {
+      _searchCtrl.text = filter.title;
+    }
     final results = ref.watch(searchResultsProvider);
     final filterCount = ref.watch(
       searchFilterProvider.select((f) => f.includedTags.length),
@@ -187,16 +195,33 @@ class _Results extends ConsumerWidget {
     }
     if (results.items.isEmpty) {
       final isKomiku = ref.watch(sourceProvider) == 'komiku';
-      return EmptyView(
+      final empty = EmptyView(
         icon: Icons.search_off_outlined,
         title: 'Tidak ditemukan',
         subtitle: isKomiku
             ? 'Coba kata kunci lain / judul Indonesianya.'
             : 'Coba kata kunci atau filter lain.',
       );
+      // Filter status diverifikasi bertahap: halaman pertama bisa kosong
+      // padahal kandidat masih tersisa -> tetap tawarkan muat lanjutan.
+      if (!results.hasMore) return empty;
+      return Column(
+        children: [
+          Expanded(child: empty),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.expand_more),
+              label: const Text('Muat lebih banyak'),
+              onPressed: () => ref
+                  .read(searchResultsProvider.notifier)
+                  .loadMore(),
+            ),
+          ),
+        ],
+      );
     }
-    // Cover Komiku aslinya landscape; MangaDex portrait.
-    final isKomiku = ref.watch(sourceProvider) == 'komiku';
+    // Kartu portrait 3 kolom ala contoh (cover anti-crop + badge + info).
     return CustomScrollView(
       controller: controller,
       slivers: [
@@ -206,15 +231,15 @@ class _Results extends ConsumerWidget {
             delegate: SliverChildBuilderDelegate(
               (ctx, i) => MangaGridCard(
                 manga: results.items[i],
-                aspectRatio: isKomiku ? 16 / 9 : 2 / 3,
               ),
               childCount: results.items.length,
             ),
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            gridDelegate:
+                const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 120,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: isKomiku ? 1.15 : 0.5,
+              childAspectRatio: 0.42,
             ),
           ),
         ),
@@ -337,7 +362,9 @@ class _FilterBar extends ConsumerWidget {
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: Text('•'),
           ),
-          for (final s in searchStatusOptions)
+          for (final s in searchStatusesFor(
+            isKomiku ? 'komiku' : 'mangadex',
+          ))
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: ChoiceChip(

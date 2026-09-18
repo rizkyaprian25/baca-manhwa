@@ -69,3 +69,30 @@ build/debug-info/
 *.db
 *.sqlite
 *.sqlite-journal
+
+# ===== AI Tools & Assistants (Opencode, Cursor, Gemini, Claude, Copilot, dsb.) =====
+.agents/
+.gemini/
+.cursor/
+.cursorrules
+.claude/
+.opencode/
+opencode.json
+.windsurf/
+.codeium/
+.aider*
+.continue/
+chatgpt/
+.chatgpt/
+*.prompt
+*.prompts
+*.agent
+*.agents
+
+# ===== Markdown Files (Kecualikan semua file .md dari Git kecuali README.md) =====
+*.md
+**/*.md
+!README.md
+!readme.md
+!**/README.md
+!**/readme.md
