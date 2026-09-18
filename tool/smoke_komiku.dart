@@ -11,13 +11,14 @@ Future<void> main() async {
   print('TRENDING: ${trending.length} — pertama: ${trending.first.title}');
 
   final latest = await ds.listPage();
-  print('LATEST: ${latest.length} — pertama: ${latest.first.title}');
+  print('LATEST P1: ${latest.length} — pertama: ${latest.first.title}');
+  final latestP2 = await ds.listPage(page: 2);
+  print('LATEST P2: ${latestP2.length} — pertama: ${latestP2.first.title}');
 
-  final found = await ds.searchPage('solo leveling');
-  print('SEARCH: ${found.length}');
-  for (final m in found.take(3)) {
-    print(' - ${m.title} (${m.id})');
-  }
+  final found = await ds.searchPage('the');
+  print('SEARCH P1 "the": ${found.length} — pertama: ${found.first.title}');
+  final foundP2 = await ds.searchPage('the', page: 2);
+  print('SEARCH P2 "the": ${foundP2.length} — pertama: ${foundP2.first.title}');
 
   final slug = found.isNotEmpty
       ? found.first.id.substring(2)
@@ -33,3 +34,4 @@ Future<void> main() async {
   print('IMAGES: ${imgs.length} pertama=${imgs.first}');
   print('SMOKE KOMIKU OK');
 }
+

@@ -204,6 +204,24 @@ void main() {
     );
     expect(r2.items.map((m) => m.id), ['a', 'b', 'c']);
     expect(r2.hasMore, true);
+
+    // Scroll bertahap melampaui 40 item (contoh 60 item) berjalan lancar
+    var accumulated = <entity.Manga>[];
+    for (var page = 1; page <= 6; page++) {
+      final pageItems = List.generate(
+        10,
+        (i) => mk('manga_${(page - 1) * 10 + i + 1}'),
+      );
+      final merged = mergeSearchPage(
+        accumulated,
+        entity.MangaPage(items: pageItems, total: 100, hasMore: page < 6),
+      );
+      accumulated = merged.items;
+      expect(merged.hasMore, page < 6);
+    }
+    expect(accumulated.length, 60);
+    expect(accumulated.first.id, 'manga_1');
+    expect(accumulated.last.id, 'manga_60');
   });
 
   test('titleMatchesQuery: kata utuh di judul (case-insensitive)', () {

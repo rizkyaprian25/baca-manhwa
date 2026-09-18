@@ -13,17 +13,8 @@ class KomikuApi {
   static const int pageSize = 10;
 
   /// Daftar pustaka: orderby modified (terbaru) | date (rilis) |
-  /// meta_value_num (peringkat). Tiap kombinasi = MAKS 10 item halaman-1.
-  /// TABEL KEBENARAN server (Fase 28, diverifikasi ulang via curl):
-  /// - `page` DIABAIKAN di semua kombinasi (hal. 2 = hal. 1 identik).
-  /// - `paged` mengembalikan KOSONG untuk endpoint list maupun search.
-  /// - `status` DIABAIKAN total -> filter status wajib verifikasi detail.
-  /// - `sorttime` (daily/weekly) MATI (isinya = list polos).
-  /// - View berbeda yang MASIH jalan: modified | date | meta_value_num,
-  ///   masing-masing bisa dikombinasikan dengan `genre` (+`genre2`).
-  /// Strategi repo: gabung semua view halaman-1 yang relevan secara
-  /// paralel, dedupe per id, urut di klien (pembaca desc / menit-lalu
-  /// asc) -> pool jujur untuk slice + infinite scroll.
+  /// meta_value_num (peringkat). Paginasi server Komiku menggunakan path
+  /// `/manga/page/{n}/` (sesuai HTMX pagination asli komiku.org).
   Future<String> listPage({
     String orderby = 'modified',
     String? sorttime,
@@ -40,24 +31,27 @@ class KomikuApi {
     if (genre != null && genre.isNotEmpty) params['genre'] = genre;
     if (genre2 != null && genre2.isNotEmpty) params['genre2'] = genre2;
     if (status != null && status.isNotEmpty) params['status'] = status;
-    if (page > 1) params['page'] = page;
+    final path = page > 1 ? '$api/manga/page/$page/' : '$api/manga/';
     final res = await _dio.get<String>(
-      '$api/manga/',
+      path,
       queryParameters: params,
     );
     return res.data ?? '';
   }
 
-  /// Search judul: SATU halaman (~8-10 hasil), tanpa paginasi.
-  /// `page` mengulang hal. 1, `paged` mengembalikan kosong (Fase 28).
+  /// Search judul: mendukung paginasi server via parameter `paged`.
   Future<String> searchPage(String query, {int page = 1}) async {
+    final params = <String, dynamic>{
+      'post_type': 'manga',
+      's': query,
+      'tipe': 'manhwa',
+    };
+    if (page > 1) {
+      params['paged'] = page;
+    }
     final res = await _dio.get<String>(
       '$api/',
-      queryParameters: {
-        'post_type': 'manga',
-        's': query,
-        'tipe': 'manhwa',
-      },
+      queryParameters: params,
     );
     return res.data ?? '';
   }

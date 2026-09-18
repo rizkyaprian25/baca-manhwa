@@ -153,7 +153,7 @@ class SearchResultsNotifier extends Notifier<SearchState> {
     try {
       final page = await ref
           .read(mangaRepositoryProvider)
-          .search(filter, limit: 10);
+          .search(filter, limit: 20);
       if (myGen != _gen) return;
       state = SearchState(
         items: page.items,
@@ -177,7 +177,7 @@ class SearchResultsNotifier extends Notifier<SearchState> {
     try {
       final page = await ref.read(mangaRepositoryProvider).search(
             filter,
-            limit: 10,
+            limit: 20,
             offset: s.items.length,
           );
       if (myGen != _gen) return;

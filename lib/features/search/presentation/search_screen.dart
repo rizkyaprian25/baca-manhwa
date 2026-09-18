@@ -56,7 +56,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onScroll() {
     if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 800) {
+        _scrollCtrl.position.maxScrollExtent - 400) {
       ref.read(searchResultsProvider.notifier).loadMore();
     }
   }
@@ -159,7 +159,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: Text(
                   results.items.isEmpty
                       ? 'Tidak ada hasil'
-                      : '${results.items.length} dari ${results.total} hasil',
+                      : (results.hasMore
+                          ? (results.total > results.items.length
+                              ? '${results.items.length} dari ${results.total} hasil'
+                              : '${results.items.length}+ hasil')
+                          : '${results.items.length} hasil'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),

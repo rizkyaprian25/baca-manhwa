@@ -62,120 +62,35 @@ class KomikuRepositoryImpl implements MangaRepository {
     return out.take(limit).toList();
   }
 
-  /// Genre kurasi (sama dengan tags()) untuk pendalaman pool browse
-  /// "semua" — satu-satunya sumber halaman-1 berbeda yang tersisa.
-  static const _poolGenres = [
-    'action',
-    'adventure',
-    'comedy',
-    'drama',
-    'fantasy',
-    'isekai',
-    'martial-arts',
-    'murim',
-    'reincarnation',
-    'revenge',
-    'romance',
-    'school-life',
-    'shounen',
-    'supernatural',
-  ];
-
-  /// Cache pool browse per kombinasi filter (sesi).
-  final Map<String, List<Manga>> _poolCache = {};
-
-  static bool _isRankedOrder(String orderKey) =>
-      orderKey == 'rating' || orderKey == 'followedCount';
-
-  /// Satu view aman-gagal (view lain tetap dipakai bila satu gagal).
-  static Future<List<Manga>> _safeView(Future<List<Manga>> f) async {
-    try {
-      return await f;
-    } catch (_) {
-      return const [];
+  static String _orderParam(String orderKey) {
+    if (orderKey == 'rating' || orderKey == 'followedCount') {
+      return 'meta_value_num';
     }
+    if (orderKey == 'date') {
+      return 'date';
+    }
+    return 'modified';
   }
 
-  /// Jalankan pembuat view per batch kecil (maks 4 serentak): ramah
-  /// throttle 5rps + hemat baterai + tak menumpuk timer. Factory dipakai
-  /// agar request batch berikutnya BARU dibuat setelah batch kini selesai.
-  static Future<List<List<Manga>>> _batchedViews(
-    List<Future<List<Manga>> Function()> makers,
-  ) async {
-    const size = 4;
-    final out = <List<Manga>>[];
-    for (var i = 0; i < makers.length; i += size) {
-      final end = (i + size).clamp(0, makers.length);
-      final chunk = makers.sublist(i, end);
-      out.addAll(await Future.wait(chunk.map((m) => _safeView(m()))));
-    }
-    return out;
-  }
-
-  /// Pool browse JUJUR: gabung semua view halaman-1 yang isinya terbukti
-  /// berbeda (modified | date | meta_value_num [+ peringkat per genre bila
-  /// tanpa genre]), dedupe per id, urut di klien. Pagination server mati
-  /// (`page` mengulang, `paged` kosong, `status` diabaikan — Fase 28),
-  /// jadi slice + infinite scroll bekerja dari pool ini.
-  Future<List<Manga>> _browsePool({
-    String? genre,
-    String? genre2,
-    required String orderKey,
+  /// Ambil rentang item melintasi beberapa halaman server jika diperlukan
+  /// (Komiku menyajikan 10 item per halaman).
+  Future<List<Manga>> _fetchRange({
+    required Future<List<Manga>> Function(int page) fetchPage,
+    required int offset,
+    required int limit,
   }) async {
-    final key = 'pool|$genre|$genre2|$orderKey';
-    final hit = _poolCache[key];
-    if (hit != null) return hit;
-    final ranked = _isRankedOrder(orderKey);
-    final makers = <Future<List<Manga>> Function()>[
-      () => remote.listPage(
-          orderby: 'modified', genre: genre, genre2: genre2, page: 1),
-      () => remote.listPage(
-          orderby: 'date', genre: genre, genre2: genre2, page: 1),
-      () => remote.listPage(
-          orderby: 'meta_value_num',
-          genre: genre,
-          genre2: genre2,
-          page: 1),
-    ];
-    if (genre == null) {
-      for (final g in _poolGenres) {
-        makers.add(() => remote.listPage(
-              orderby: ranked ? 'meta_value_num' : 'modified',
-              genre: g,
-              page: 1,
-            ));
+    final startPage = (offset ~/ KomikuApi.pageSize) + 1;
+    final endPage = ((offset + limit - 1) ~/ KomikuApi.pageSize) + 1;
+    final all = <Manga>[];
+    for (var p = startPage; p <= endPage; p++) {
+      final pageItems = await fetchPage(p);
+      all.addAll(pageItems);
+      if (pageItems.length < KomikuApi.pageSize) {
+        break;
       }
     }
-    final views = await _batchedViews(makers);
-    final ids = <String>{};
-    final pool = <Manga>[];
-    for (final v in views) {
-      for (final m in v) {
-        if (ids.add(m.id)) pool.add(m);
-      }
-    }
-    final pos = {for (var i = 0; i < pool.length; i++) pool[i].id: i};
-    if (ranked) {
-      pool.sort((a, b) {
-        final c = (b.followedCount ?? -1)
-            .compareTo(a.followedCount ?? -1);
-        return c != 0 ? c : pos[a.id]!.compareTo(pos[b.id]!);
-      });
-    } else {
-      pool.sort((a, b) {
-        final am = k.parseUpdateAgoMinutes(a.updateAgo);
-        final bm = k.parseUpdateAgoMinutes(b.updateAgo);
-        if (am == null && bm == null) {
-          return pos[a.id]!.compareTo(pos[b.id]!);
-        }
-        if (am == null) return 1;
-        if (bm == null) return -1;
-        final c = am.compareTo(bm);
-        return c != 0 ? c : pos[a.id]!.compareTo(pos[b.id]!);
-      });
-    }
-    _poolCache[key] = pool;
-    return pool;
+    final skip = offset % KomikuApi.pageSize;
+    return all.skip(skip).take(limit).toList();
   }
 
   @override
@@ -184,51 +99,61 @@ class KomikuRepositoryImpl implements MangaRepository {
     int limit = 20,
     int offset = 0,
   }) async {
+    // 1. Pencarian teks / judul komik
     if (filter.title.trim().isNotEmpty) {
-      // Search judul: server hanya punya SATU halaman (~8-10 hasil, tanpa
-      // paginasi). Saring kata-utuh karena server mencampur hasil
-      // tak-relevan (cocok sinopsis). hasMore=false yang jujur.
       final q = filter.title.trim();
-      final raw = await remote.searchPage(q);
-      final seen = <String>{};
-      final all = <Manga>[];
-      for (final m in raw) {
-        if (seen.add(m.id) && k.titleMatchesQuery(m.title, q)) {
-          all.add(m);
-        }
-      }
-      await db.upsertMangas(all.map(mangaToCompanion).toList());
-      return MangaPage(items: all, total: all.length, hasMore: false);
+      final items = await _fetchRange(
+        fetchPage: (p) => remote.searchPage(q, page: p),
+        offset: offset,
+        limit: limit,
+      );
+      await db.upsertMangas(items.map(mangaToCompanion).toList());
+      final hasMore = items.length >= limit;
+      return MangaPage(
+        items: items,
+        total: offset + items.length + (hasMore ? 10 : 0),
+        hasMore: hasMore,
+      );
     }
+
+    // 2. Jelajah / Browse (urutan, genre, status)
     final orderKey =
         filter.order.keys.isEmpty ? '' : filter.order.keys.first;
+    final orderby = _orderParam(orderKey);
     final tags = filter.includedTags;
     final genre = tags.isEmpty ? null : tags.first;
     final genre2 = tags.length > 1 ? tags[1] : null;
     final status = _status(filter.status);
-    // Status: server MENGABAIKAN param status (terbukti) → verifikasi
-    // via halaman detail (satu-satunya sumber benar), lazy per batch.
+
+    // Filter status khusus (ongoing/end) diverifikasi bertahap via detail
     if (status != null) {
       return _statusBrowse(
         genre: genre,
         genre2: genre2,
         wanted: status,
-        orderKey: orderKey,
+        orderby: orderby,
         limit: limit,
         offset: offset,
       );
     }
-    final pool = await _browsePool(
-      genre: genre,
-      genre2: genre2,
-      orderKey: orderKey,
+
+    // Mode Jelajah default: paginasi server /manga/page/{n}/ tanpa batas buatan
+    final items = await _fetchRange(
+      fetchPage: (p) => remote.listPage(
+        orderby: orderby,
+        genre: genre,
+        genre2: genre2,
+        page: p,
+      ),
+      offset: offset,
+      limit: limit,
     );
-    final slice = pool.skip(offset).take(limit).toList();
-    await db.upsertMangas(slice.map(mangaToCompanion).toList());
+    await db.upsertMangas(items.map(mangaToCompanion).toList());
+    final hasMore = items.length >= limit;
     return MangaPage(
-      items: slice,
-      total: pool.length,
-      hasMore: offset + limit < pool.length,
+      items: items,
+      total: offset + items.length + (hasMore ? 10 : 0),
+      hasMore: hasMore,
     );
   }
 
@@ -261,32 +186,51 @@ class KomikuRepositoryImpl implements MangaRepository {
     String? genre,
     String? genre2,
     required String wanted,
-    required String orderKey,
+    required String orderby,
     required int limit,
     required int offset,
   }) async {
-    final key = 'st|$genre|$genre2|$wanted|$orderKey';
+    final key = 'st|$genre|$genre2|$wanted|$orderby';
     var job = _statusJobs[key];
     if (job == null) {
-      // Pool kandidat = pool browse yang sama (sudah dalam): status hanya
-      // menyaring, tak mengubah urutan.
-      final pool = await _browsePool(
+      job = _StatusJob(
         genre: genre,
         genre2: genre2,
-        orderKey: orderKey,
+        orderby: orderby,
+        wanted: wanted,
       );
-      job = _StatusJob(pool);
       _statusJobs[key] = job;
     }
-    // Verifikasi LAZY per batch 6 paralel sampai kebutuhan halaman
-    // terpenuhi atau kandidat habis — halaman pertama tampil cepat,
-    // scroll berikutnya melanjutkan. cursor dicadangkan sinkron sebelum
-    // await sehingga panggilan tumpang-tindih tak memverifikasi ganda.
+
     final need = offset + limit;
-    while (job.matched.length < need &&
-        job.cursor < job.candidates.length) {
-      final batch =
-          job.candidates.skip(job.cursor).take(6).toList();
+    while (job.matched.length < need) {
+      while (job.cursor >= job.candidates.length && !job.noMoreCandidates) {
+        final pageItems = await remote.listPage(
+          orderby: job.orderby,
+          genre: job.genre,
+          genre2: job.genre2,
+          page: job.candidatePage++,
+        );
+        if (pageItems.isEmpty) {
+          job.noMoreCandidates = true;
+          break;
+        }
+        for (final m in pageItems) {
+          if (job.candidateIds.add(m.id)) {
+            job.candidates.add(m);
+          }
+        }
+        if (pageItems.length < KomikuApi.pageSize) {
+          job.noMoreCandidates = true;
+          break;
+        }
+      }
+
+      if (job.cursor >= job.candidates.length) {
+        break;
+      }
+
+      final batch = job.candidates.skip(job.cursor).take(6).toList();
       job.cursor += batch.length;
       final statuses = await Future.wait(batch.map(_resolveStatus));
       for (var i = 0; i < batch.length; i++) {
@@ -296,14 +240,15 @@ class KomikuRepositoryImpl implements MangaRepository {
         }
       }
     }
+
     final slice = job.matched.skip(offset).take(limit).toList();
     await db.upsertMangas(slice.map(mangaToCompanion).toList());
+    final hasMore =
+        offset + limit < job.matched.length || !job.noMoreCandidates;
     return MangaPage(
       items: slice,
-      // total = yang sudah terverifikasi sejauh ini (tumbuh saat scroll).
-      total: job.matched.length,
-      hasMore: offset + limit < job.matched.length ||
-          job.cursor < job.candidates.length,
+      total: job.matched.length + (hasMore ? 10 : 0),
+      hasMore: hasMore,
     );
   }
 
@@ -378,11 +323,25 @@ class KomikuRepositoryImpl implements MangaRepository {
   }
 }
 
-/// Pekerjaan verifikasi status lazy: kandidat diverifikasi bertahap
-/// (batch paralel), yang cocok dikumpulkan di [matched].
+/// Pekerjaan verifikasi status lazy: kandidat diambil bertahap per halaman server
+/// lalu diverifikasi per batch paralel.
 class _StatusJob {
-  _StatusJob(this.candidates);
-  final List<Manga> candidates;
+  _StatusJob({
+    required this.genre,
+    required this.genre2,
+    required this.orderby,
+    required this.wanted,
+  });
+  final String? genre;
+  final String? genre2;
+  final String orderby;
+  final String wanted;
+
+  final List<Manga> candidates = [];
+  final Set<String> candidateIds = {};
+  int candidatePage = 1;
+  bool noMoreCandidates = false;
+
   final List<Manga> matched = [];
   final Set<String> matchedIds = {};
   int cursor = 0;
