@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'core/database/tables/library_entries.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/apple_loading.dart';
+import 'core/widgets/liquid_glass.dart';
 import 'features/download/presentation/downloads_screen.dart';
 import 'features/history/presentation/history_screen.dart';
 import 'features/home/presentation/home_screen.dart';
@@ -87,39 +89,41 @@ class _ScaffoldWithNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: navigationShell.goBranch,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.cottage_outlined),
-            selectedIcon: Icon(Icons.cottage),
-            label: 'Beranda',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Jelajah',
-          ),
-          NavigationDestination(
-            icon: _PustakaBadge(selected: false),
-            selectedIcon: _PustakaBadge(selected: true),
-            label: 'Pustaka',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: 'Riwayat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune),
-            label: 'Setelan',
-          ),
-        ],
+    return AppleLaunchOverlay(
+      child: Scaffold(
+        extendBody: true,
+        body: navigationShell,
+        bottomNavigationBar: AppleLiquidGlassBottomBar(
+          selectedIndex: navigationShell.currentIndex,
+          onTap: navigationShell.goBranch,
+          destinations: const [
+            AppleNavDestination(
+              icon: Icon(Icons.cottage_outlined),
+              selectedIcon: Icon(Icons.cottage),
+              label: 'Beranda',
+            ),
+            AppleNavDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
+              label: 'Jelajah',
+            ),
+            AppleNavDestination(
+              icon: _PustakaBadge(selected: false),
+              selectedIcon: _PustakaBadge(selected: true),
+              label: 'Pustaka',
+            ),
+            AppleNavDestination(
+              icon: Icon(Icons.history_outlined),
+              selectedIcon: Icon(Icons.history),
+              label: 'Riwayat',
+            ),
+            AppleNavDestination(
+              icon: Icon(Icons.tune_outlined),
+              selectedIcon: Icon(Icons.tune),
+              label: 'Setelan',
+            ),
+          ],
+        ),
       ),
     );
   }

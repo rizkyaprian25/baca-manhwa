@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/empty_view.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/manga_grid_card.dart';
@@ -24,6 +25,7 @@ class SearchScreen extends ConsumerStatefulWidget {
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _focusNode = FocusNode();
   Timer? _debounce;
 
   @override
@@ -40,10 +42,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       } else if (ref.read(searchFilterProvider).title.isNotEmpty) {
         _searchCtrl.clear();
         notifier.setTitle('');
-        setState(() {});
       }
       ref.read(searchResultsProvider.notifier).search();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialQuery != oldWidget.initialQuery &&
+        widget.initialQuery.isNotEmpty) {
+      _debounce?.cancel();
+      _searchCtrl.text = widget.initialQuery;
+      _searchCtrl.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.initialQuery.length),
+      );
+      ref.read(searchFilterProvider.notifier).setTitle(widget.initialQuery);
+      _research();
+    }
   }
 
   @override
@@ -51,6 +67,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce?.cancel();
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -73,15 +90,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Sinkronkan kotak teks hanya bila judul di provider berubah dari luar
+    // (mis. reset filter) dan pengguna TIDAK sedang fokus mengetik.
+    ref.listen<String>(
+      searchFilterProvider.select((f) => f.title),
+      (prev, next) {
+        if (_searchCtrl.text.trim() != next && !_focusNode.hasFocus) {
+          _searchCtrl.text = next;
+          _searchCtrl.selection = TextSelection.fromPosition(
+            TextPosition(offset: next.length),
+          );
+        }
+      },
+    );
+
     final filter = ref.watch(searchFilterProvider);
-    // Satu filter dipakai bersama (tab Jelajah + rute /search dari Beranda):
-    // bila judul di provider berubah dari tempat lain (mis. layar Jelajah
-    // lain me-reset), sinkronkan kotak teks agar tak "nempel" teks basi.
-    // Aman di build: set programatik tak memicu onChanged, spasi akhir
-    // saat mengetik diabaikan via trim.
-    if (_searchCtrl.text.trim() != filter.title) {
-      _searchCtrl.text = filter.title;
-    }
     final results = ref.watch(searchResultsProvider);
     final filterCount = ref.watch(
       searchFilterProvider.select((f) => f.includedTags.length),
@@ -93,39 +116,41 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Cari komik...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchCtrl.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            ref
-                                .read(searchFilterProvider.notifier)
-                                .setTitle('');
-                            _research();
-                            setState(() {});
-                          },
-                        ),
-                  filled: true,
-                  fillColor:
-                      Theme.of(context).colorScheme.surfaceContainerHigh,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchCtrl,
+              focusNode: _focusNode,
+              decoration: InputDecoration(
+                hintText: 'Cari komik...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _searchCtrl,
+                  builder: (context, value, _) {
+                    if (value.text.isEmpty) return const SizedBox.shrink();
+                    return IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _debounce?.cancel();
+                        _searchCtrl.clear();
+                        ref
+                            .read(searchFilterProvider.notifier)
+                            .setTitle('');
+                        _research();
+                      },
+                    );
+                  },
                 ),
+                filled: true,
+                fillColor:
+                    Theme.of(context).colorScheme.surfaceContainerHigh,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16),
+              ),
               textInputAction: TextInputAction.search,
-              onChanged: (v) {
-                setState(() {});
-                _onTitleChanged(v);
-              },
+              onChanged: _onTitleChanged,
               onSubmitted: (_) {
                 _debounce?.cancel();
                 final q = _searchCtrl.text.trim();
@@ -145,9 +170,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           if (filter.title.isEmpty)
             _RecentRow(
               onPick: (q) {
+                _debounce?.cancel();
                 _searchCtrl.text = q;
+                _searchCtrl.selection = TextSelection.fromPosition(
+                  TextPosition(offset: q.length),
+                );
                 ref.read(searchFilterProvider.notifier).setTitle(q);
-                setState(() {});
                 _research();
               },
             ),
@@ -251,7 +279,7 @@ class _Results extends ConsumerWidget {
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: AppleLoadingIndicator(radius: 12)),
             ),
           ),
         if (!results.isLoadingMore && results.hasMore)
@@ -279,6 +307,7 @@ class _Results extends ConsumerWidget {
               ),
             ),
           ),
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
       ],
     );
   }
@@ -463,7 +492,7 @@ Future<void> _openGenreSheet(
           ],
         ),
         loading: () =>
-            const Center(child: CircularProgressIndicator()),
+            const AppleLoadingView(message: 'Memuat kategori genre...'),
         error: (e, _) => ErrorView(
           error: e,
           onRetry: () => ref.invalidate(tagsProvider),

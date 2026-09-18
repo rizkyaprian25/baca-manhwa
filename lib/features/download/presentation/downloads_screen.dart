@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables/downloads.dart';
 import '../../../core/utils/storage_helper.dart';
+import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/empty_view.dart';
 import '../../../core/widgets/error_view.dart';
 import 'download_provider.dart';
@@ -30,7 +31,7 @@ class DownloadsScreen extends ConsumerWidget {
             error: error,
             onRetry: () => ref.invalidate(downloadsStreamProvider),
           ),
-        _ => const Center(child: CircularProgressIndicator()),
+        _ => const AppleLoadingView(message: 'Memeriksa daftar unduhan...'),
       },
     );
   }
@@ -58,8 +59,8 @@ class DownloadsScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               _ => const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  dimension: 18,
+                  child: AppleLoadingIndicator(radius: 9),
                 ),
             },
           ),

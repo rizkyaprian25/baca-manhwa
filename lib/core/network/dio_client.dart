@@ -49,6 +49,14 @@ class _ThrottleInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    // Proteksi keamanan: tolak skema tidak terenkripsi
+    final uri = options.uri;
+    if (uri.hasScheme && uri.scheme != 'https') {
+      return handler.reject(DioException(
+        requestOptions: options,
+        error: 'Insecure protocol rejected: scheme must be HTTPS',
+      ));
+    }
     final now = DateTime.now();
     _hits.removeWhere((t) => now.difference(t).inMilliseconds >= 1000);
     if (_hits.length >= AppConstants.maxRequestsPerSecond) {

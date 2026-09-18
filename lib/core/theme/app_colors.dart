@@ -50,6 +50,12 @@ class AppColors {
   static const Color langIdBadge = Color(0xFF00A572);
   static const Color langEnBadge = Color(0xFF009BD1);
 
+  // Liquid Glass Tokens (Apple HIG Translucency)
+  static const Color glassDarkFill = Color(0xB812151D);
+  static const Color glassDarkBorder = Color(0x1FFFFFFF);
+  static const Color glassLightFill = Color(0xD6FFFFFF);
+  static const Color glassLightBorder = Color(0x14000000);
+
   static const ColorScheme darkScheme = ColorScheme(
     brightness: Brightness.dark,
     primary: primary,
@@ -90,7 +96,7 @@ class AppColors {
     onError: Colors.white,
     surface: lightSurface,
     onSurface: lightOnSurface,
-    onSurfaceVariant: Color(0xFF5A6B7D),
+    onSurfaceVariant: Color(0xFF6E6E73),
     surfaceContainerLowest: Colors.white,
     surfaceContainerLow: Color(0xFFF7FAFD),
     surfaceContainer: Colors.white,

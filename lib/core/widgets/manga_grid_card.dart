@@ -21,7 +21,7 @@ class MangaGridCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       onTap: () => context.push('/manga/${manga.id}'),
       onLongPress: () => showMangaQuickActions(context, ref, manga),
       child: Card(
@@ -104,17 +104,18 @@ class MangaGridCard extends ConsumerWidget {
       };
 
   Widget _pill(String text, Color bg, Color fg) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           text,
           style: TextStyle(
             color: fg,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
+            fontSize: 9.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
           ),
         ),
       );

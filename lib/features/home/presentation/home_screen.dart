@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/number_formatter.dart';
 import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/cover_image.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -132,7 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           filled: true,
                           fillColor: scheme.surfaceContainerHigh,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
@@ -150,7 +151,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         minimumSize: const Size(48, 48),
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       onPressed: () => context.push('/search'),
@@ -175,7 +176,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             SliverToBoxAdapter(child: _LatestGrid()),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
             const SliverToBoxAdapter(child: _ApiStatus()),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         ),
       ),
@@ -242,19 +243,16 @@ class _Spotlight extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: AspectRatio(
-                  aspectRatio: 16 / 10,
-                  child: PageView.builder(
-                    onPageChanged: onPage,
-                    itemCount: value.length.clamp(0, 5),
-                    itemBuilder: (_, i) =>
-                        _SpotlightCard(manga: value[i]),
-                  ),
+              SizedBox(
+                height: 185,
+                child: PageView.builder(
+                  onPageChanged: onPage,
+                  itemCount: value.length.clamp(0, 5),
+                  itemBuilder: (_, i) =>
+                      _SpotlightCard(manga: value[i], rank: i + 1),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -292,12 +290,14 @@ class _Spotlight extends ConsumerWidget {
 }
 
 class _SpotlightCard extends ConsumerWidget {
-  const _SpotlightCard({required this.manga});
+  const _SpotlightCard({required this.manga, required this.rank});
   final Manga manga;
+  final int rank;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final fav = ref
             .watch(libraryTabProvider(LibraryList.favorite))
             .value
@@ -308,148 +308,181 @@ class _SpotlightCard extends ConsumerWidget {
         : (manga.followedCount != null
             ? formatCompactId(manga.followedCount!)
             : null);
-    return InkWell(
-      onTap: () => context.push('/manga/${manga.id}'),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          CoverImage(
-            url: manga.coverUrl,
-            aspectRatio: 16 / 10,
-            borderRadius: 0,
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.6),
-                  Colors.black.withValues(alpha: 0.92),
-                ],
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFE4E8EE),
+          width: 0.8,
+        ),
+      ),
+      child: InkWell(
+        onTap: () => context.push('/manga/${manga.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Poster POTRAIT alami tanpa over-zoom (rasio 2:3)
+              Container(
+                width: 105,
+                height: 158,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.35)
+                          : Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CoverImage(
+                    url: manga.coverUrl,
+                    aspectRatio: 2 / 3,
+                    borderRadius: 0,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    memCacheWidth: 260,
+                    memCacheHeight: 390,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 14,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              const SizedBox(width: 14),
+              // Informasi teks & aksi di sebelah kanan
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            scheme.primary.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'SPOTLIGHT #1',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: scheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'SPOTLIGHT #$rank',
+                            style: TextStyle(
                               color: scheme.primary,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
                             ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (score != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                size: 14,
+                                color: Colors.amber,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                score,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      manga.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
                       ),
                     ),
-                    const Spacer(),
-                    if (score != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
+                    if (manga.tags.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          manga.tags.take(3).map((t) => t.name).join(' • '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              score,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 0,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                          ],
+                            onPressed: () =>
+                                context.push('/manga/${manga.id}'),
+                            child: Text(
+                              manga.latestChapter != null
+                                  ? 'Ch. ${manga.latestChapter}'
+                                  : 'Mulai Baca',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  manga.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                if (manga.tags.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      manga.tags.take(3).map((t) => t.name).join(' • '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Colors.white70),
-                    ),
-                  ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.menu_book),
-                        label: Text(
-                          manga.latestChapter != null
-                              ? 'Mulai Baca Ch. ${manga.latestChapter}'
-                              : 'Mulai Baca',
+                        const SizedBox(width: 4),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Favorit',
+                          icon: Icon(
+                            fav ? Icons.bookmark : Icons.bookmark_add_outlined,
+                            color: fav ? scheme.primary : scheme.outline,
+                            size: 20,
+                          ),
+                          onPressed: () => ref
+                              .read(libraryActionsProvider)
+                              .toggle(context, manga, LibraryList.favorite),
                         ),
-                        onPressed: () =>
-                            context.push('/manga/${manga.id}'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      tooltip: 'Favorit',
-                      icon: Icon(
-                        fav ? Icons.bookmark : Icons.bookmark_add_outlined,
-                      ),
-                      onPressed: () => ref
-                          .read(libraryActionsProvider)
-                          .toggle(context, manga, LibraryList.favorite),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -675,7 +708,7 @@ class _LatestGrid extends ConsumerWidget {
           if (st.loadingMore)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: AppleLoadingIndicator(radius: 12)),
             ),
           if (!st.hasMore && st.items.isNotEmpty && !st.loadingMore)
             Padding(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/database_provider.dart';
 import '../../../core/utils/date_formatter.dart';
+import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/empty_view.dart';
 import '../../../core/widgets/error_view.dart';
 import 'history_provider.dart';
@@ -35,6 +36,7 @@ class HistoryScreen extends ConsumerWidget {
             subtitle: 'Chapter yang kamu buka akan tercatat di sini.',
           ),
         AsyncData(:final value) => ListView.builder(
+            padding: const EdgeInsets.only(bottom: 96),
             itemCount: value.length,
             itemBuilder: (_, i) {
               final h = value[i];
@@ -101,7 +103,7 @@ class HistoryScreen extends ConsumerWidget {
             error: error,
             onRetry: () => ref.invalidate(groupedHistoryProvider),
           ),
-        _ => const Center(child: CircularProgressIndicator()),
+        _ => const AppleLoadingView(message: 'Memuat riwayat bacaan...'),
       },
     );
   }

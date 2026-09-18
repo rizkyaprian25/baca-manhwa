@@ -342,7 +342,7 @@ class _LibraryTab extends ConsumerWidget {
     }
     if (grid) {
       return GridView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 180,
           mainAxisSpacing: 12,
@@ -357,7 +357,7 @@ class _LibraryTab extends ConsumerWidget {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (_, i) => _LibraryRow(
@@ -708,7 +708,7 @@ class _DownloadsTab extends ConsumerWidget {
     final list = ref.watch(downloadsStreamProvider).value ?? const [];
     final total = ref.watch(totalDownloadBytesProvider).value ?? 0;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       children: [
         Card(
           child: Padding(

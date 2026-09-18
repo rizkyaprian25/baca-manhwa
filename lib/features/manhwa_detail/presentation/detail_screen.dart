@@ -12,6 +12,7 @@ import '../../../core/database/tables/library_entries.dart';
 import '../../../core/utils/content_rating_filter.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
+import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/cover_image.dart';
 import '../../../core/widgets/empty_view.dart';
 import '../../../core/widgets/error_view.dart';
@@ -1026,7 +1027,7 @@ class _DetailSkeleton extends StatelessWidget {
             const SizedBox(height: 16),
             Container(height: 48, color: c),
             const SizedBox(height: 24),
-            const Center(child: CircularProgressIndicator()),
+            const AppleLoadingView(message: 'Memuat detail manhwa...'),
           ],
         ),
       ),

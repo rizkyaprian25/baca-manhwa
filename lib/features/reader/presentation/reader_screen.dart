@@ -10,6 +10,7 @@ import 'package:photo_view/photo_view.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
+import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/reader_image_provider.dart';
 import '../../../core/widgets/reader_page_image.dart';
@@ -394,7 +395,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
     if (_chapter == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: AppleLoadingView(message: 'Menyiapkan bab...'),
       );
     }
     final atHome = ref.watch(atHomeProvider(widget.chapterId));
@@ -418,7 +419,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 onRetry: () =>
                     ref.invalidate(atHomeProvider(widget.chapterId)),
               ),
-            _ => const Center(child: CircularProgressIndicator()),
+            _ => const AppleLoadingView(message: 'Memuat halaman chapter...'),
           },
           if (dim > 0)
             Positioned.fill(
