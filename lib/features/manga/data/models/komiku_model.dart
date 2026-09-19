@@ -2,6 +2,7 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../domain/entities/manga.dart';
+import '../../../../core/network/reader_image_headers.dart';
 
 /// Parsing HTML Komiku -> entity.
 /// `lib/features/manga/data/models/komiku_model.dart`.
@@ -256,6 +257,9 @@ List<String> komikuChapterImages(String html) {
             src.endsWith('.png') ||
             src.endsWith('.webp'))) {
       if (src.startsWith('//')) src = 'https:$src';
+      // Subdomain image2..image14.komiku.to sering timeout/rusak di Indonesia;
+      // img.komiku.org adalah origin server resmi (sesuai onerror komiku) yang selalu aktif.
+      src = normalizeImageUrl(src);
       out.add(src);
     }
   }

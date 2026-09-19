@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import '../network/reader_image_headers.dart';
 
 /// Versi Web: selalu network (localPath diabaikan).
-/// Mendukung HTTP headers anti-throttling untuk reader gambar manhwa.
+/// Mendukung normalisasi host origin dan HTTP headers anti-throttling.
 /// `lib/core/widgets/reader_image_provider_stub.dart`.
 ImageProvider readerImageProvider(String url, String? localPath) {
+  final normalized = normalizeImageUrl(url);
   return CachedNetworkImageProvider(
-    url,
-    headers: readerImageHeaders(url),
+    normalized,
+    headers: readerImageHeaders(normalized),
   );
 }

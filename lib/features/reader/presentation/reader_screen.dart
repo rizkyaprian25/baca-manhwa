@@ -225,7 +225,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       final count = AppConstants.readerPreloadPages;
       for (var i = idx + 1; i <= idx + count && i < at.pageCount; i++) {
         if (local != null && i < local.length) continue; // sudah lokal
-        final u = at.pageUrl(i, dataSaver: saver);
+        final raw = at.pageUrl(i, dataSaver: saver);
+        final u = normalizeImageUrl(raw);
         precacheImage(
           CachedNetworkImageProvider(
             u,
@@ -247,8 +248,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       final start = (cur - 2).clamp(0, at.pageCount - 1);
       final end = (cur + 3).clamp(0, at.pageCount - 1);
       for (var i = start; i <= end; i++) {
-        final u = at.pageUrl(i, dataSaver: saver);
-        await CachedNetworkImage.evictFromCache(u);
+        final raw = at.pageUrl(i, dataSaver: saver);
+        await CachedNetworkImage.evictFromCache(raw);
+        await CachedNetworkImage.evictFromCache(normalizeImageUrl(raw));
       }
     }
     _lastPrecachePage = -1;
@@ -985,7 +987,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           itemCount: atHome.pageCount + 1,
           itemBuilder: (ctx, i) {
             if (i == atHome.pageCount) return _footer();
-            final url = atHome.pageUrl(i, dataSaver: saver);
+            final url = normalizeImageUrl(atHome.pageUrl(i, dataSaver: saver));
             final local = _localPathFor(localPaths, i);
             final key = _keys.putIfAbsent(i, () => GlobalKey());
             return GestureDetector(
@@ -1133,7 +1135,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         itemCount: atHome.pageCount,
         onPageChanged: (i) => _savePage(i),
         itemBuilder: (ctx, i) {
-          final url = atHome.pageUrl(i, dataSaver: saver);
+          final url = normalizeImageUrl(atHome.pageUrl(i, dataSaver: saver));
           return _HorizontalPageKeepAlive(
             child: PhotoView(
               imageProvider:

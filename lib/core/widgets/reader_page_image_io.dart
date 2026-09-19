@@ -29,7 +29,7 @@ class ReaderPageImage extends StatefulWidget {
 
 class _ReaderPageImageState extends State<ReaderPageImage>
     with AutomaticKeepAliveClientMixin {
-  late String _url = widget.url;
+  late String _url = normalizeImageUrl(widget.url);
   bool _fellBack = false;
   int _refreshKey = 0;
 
@@ -40,16 +40,26 @@ class _ReaderPageImageState extends State<ReaderPageImage>
   void didUpdateWidget(covariant ReaderPageImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.url != oldWidget.url) {
-      _url = widget.url;
+      _url = normalizeImageUrl(widget.url);
       _fellBack = false;
       _refreshKey = 0;
     }
   }
 
-  /// Host cadangan Komiku (sama seperti onerror di situsnya).
+  /// Host cadangan Komiku / MangaDex bila server utama mengalami kendala.
   String? get _fallback {
-    if (_fellBack || !_url.contains('image2.komiku.to')) return null;
-    return _url.replaceFirst('image2.komiku.to', 'img.komiku.org');
+    if (_fellBack) return null;
+    if (_url.contains('img.komiku.org')) {
+      return _url.replaceFirst('img.komiku.org', 'image2.komiku.to');
+    }
+    if (_url.contains('.komiku.to')) {
+      return _url.replaceAll(RegExp(r'image\d*\.komiku\.to'), 'img.komiku.org');
+    }
+    if (_url.contains('mangadex.network')) {
+      final uri = Uri.parse(_url);
+      return 'https://uploads.mangadex.org${uri.path}';
+    }
+    return null;
   }
 
   Future<void> _refresh() async {

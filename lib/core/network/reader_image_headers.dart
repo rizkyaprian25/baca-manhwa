@@ -32,3 +32,16 @@ Map<String, String> readerImageHeaders(String url) {
         'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
   };
 }
+
+/// Normalisasi URL gambar agar selalu menggunakan host origin yang aktif dan andal.
+/// Mengonversi subdomain Komiku yang mati/sering timeout (seperti image2..14.komiku.to)
+/// menjadi origin server resmi 'img.komiku.org'.
+String normalizeImageUrl(String url) {
+  if (url.contains('.komiku.to') && url.contains('/upload')) {
+    return url.replaceAll(
+      RegExp(r'https?://image\d*\.komiku\.to'),
+      'https://img.komiku.org',
+    );
+  }
+  return url;
+}

@@ -91,6 +91,45 @@ void main() {
     });
   });
 
+  group('Reader Image URL Normalization Test', () {
+    test('mengonversi domain imageN.komiku.to ke img.komiku.org untuk hindari socket timeout', () {
+      expect(
+        normalizeImageUrl('https://image3.komiku.to/uploads2/page10.jpg'),
+        equals('https://img.komiku.org/uploads2/page10.jpg'),
+      );
+      expect(
+        normalizeImageUrl('http://image2.komiku.to/uploads2/page1.jpg'),
+        equals('https://img.komiku.org/uploads2/page1.jpg'),
+      );
+      expect(
+        normalizeImageUrl('https://image.komiku.to/uploads2/page1.jpg'),
+        equals('https://img.komiku.org/uploads2/page1.jpg'),
+      );
+      expect(
+        normalizeImageUrl('https://image14.komiku.to/uploads2/page50.jpg'),
+        equals('https://img.komiku.org/uploads2/page50.jpg'),
+      );
+    });
+
+    test('img.komiku.org tetap dipertahankan tanpa perubahan', () {
+      expect(
+        normalizeImageUrl('https://img.komiku.org/uploads2/page10.jpg'),
+        equals('https://img.komiku.org/uploads2/page10.jpg'),
+      );
+    });
+
+    test('thumbnail dan provider lain tidak terpengaruh', () {
+      expect(
+        normalizeImageUrl('https://thumbnail.komiku.to/upload/poster.jpg'),
+        equals('https://thumbnail.komiku.to/upload/poster.jpg'),
+      );
+      expect(
+        normalizeImageUrl('https://uploads.mangadex.org/data/abc/1.jpg'),
+        equals('https://uploads.mangadex.org/data/abc/1.jpg'),
+      );
+    });
+  });
+
   group('Reader Buffering Watchdog & Refresh Widget Test', () {
     testWidgets('ReaderBufferingPlaceholder awalnya tampil tanpa tombol segarkan', (tester) async {
       await tester.pumpWidget(

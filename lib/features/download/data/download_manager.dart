@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables/downloads.dart';
+import '../../../core/network/reader_image_headers.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/providers/network_provider.dart';
 import '../../manga/providers/manga_providers.dart';
@@ -144,10 +145,14 @@ class DownloadManager {
           bytes += await file.length();
           continue; // resume: lewati file yang sudah ada
         }
-        final url = at.pageUrl(i, dataSaver: false);
+        final raw = at.pageUrl(i, dataSaver: false);
+        final url = normalizeImageUrl(raw);
         final res = await dio.get<List<int>>(
           url,
-          options: Options(responseType: ResponseType.bytes),
+          options: Options(
+            responseType: ResponseType.bytes,
+            headers: readerImageHeaders(url),
+          ),
         );
         final data = res.data ?? [];
         await file.writeAsBytes(data, flush: true);
