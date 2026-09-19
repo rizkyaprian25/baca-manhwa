@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import 'apple_loading.dart';
+import '../network/reader_image_headers.dart';
+import 'reader_buffering_placeholder.dart';
 
 /// Halaman reader: file lokal bila ada, network bila tidak.
 /// Mendukung retensi render (KeepAlive) anti-blink saat scroll balik ke atas,
-/// dan downsampling memCacheWidth hemat memori.
+/// header HTTP anti-throttling, watchdog buffering lambat, serta fitur segarkan gambar.
 /// `lib/core/widgets/reader_page_image_io.dart`.
 class ReaderPageImage extends StatefulWidget {
   const ReaderPageImage({
@@ -15,10 +16,12 @@ class ReaderPageImage extends StatefulWidget {
     required this.url,
     this.localPath,
     required this.onRetry,
+    this.pageIndex,
   });
   final String url;
   final String? localPath;
   final VoidCallback onRetry;
+  final int? pageIndex;
 
   @override
   State<ReaderPageImage> createState() => _ReaderPageImageState();
@@ -28,14 +31,45 @@ class _ReaderPageImageState extends State<ReaderPageImage>
     with AutomaticKeepAliveClientMixin {
   late String _url = widget.url;
   bool _fellBack = false;
+  int _refreshKey = 0;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void didUpdateWidget(covariant ReaderPageImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.url != oldWidget.url) {
+      _url = widget.url;
+      _fellBack = false;
+      _refreshKey = 0;
+    }
+  }
 
   /// Host cadangan Komiku (sama seperti onerror di situsnya).
   String? get _fallback {
     if (_fellBack || !_url.contains('image2.komiku.to')) return null;
     return _url.replaceFirst('image2.komiku.to', 'img.komiku.org');
+  }
+
+  Future<void> _refresh() async {
+    await CachedNetworkImage.evictFromCache(_url);
+    if (mounted) {
+      setState(() {
+        _refreshKey++;
+      });
+    }
+  }
+
+  void _triggerFallback() {
+    final fb = _fallback;
+    if (fb != null && mounted) {
+      setState(() {
+        _url = fb;
+        _fellBack = true;
+        _refreshKey++;
+      });
+    }
   }
 
   @override
@@ -63,20 +97,24 @@ class _ReaderPageImageState extends State<ReaderPageImage>
         ? scheme.surfaceContainerLowest
         : scheme.surfaceContainerHighest.withValues(alpha: 0.3);
 
+    final pageText =
+        widget.pageIndex != null ? 'Hal. ${widget.pageIndex! + 1}' : null;
+
     return CachedNetworkImage(
-      key: ValueKey(_url),
+      key: ValueKey('$_url-$_refreshKey'),
       imageUrl: _url,
+      httpHeaders: readerImageHeaders(_url),
       width: double.infinity,
       fit: BoxFit.fitWidth,
       memCacheWidth: cacheWidth,
       fadeInDuration: const Duration(milliseconds: 100),
       fadeOutDuration: Duration.zero,
-      placeholder: (_, _) => Container(
+      placeholder: (_, _) => ReaderBufferingPlaceholder(
         height: 320,
-        color: placeholderBg,
-        child: const Center(
-          child: AppleLoadingIndicator(radius: 12),
-        ),
+        backgroundColor: placeholderBg,
+        pageLabel: pageText,
+        onRefresh: _refresh,
+        onTimeout: _triggerFallback,
       ),
       errorWidget: (_, _, _) {
         final fb = _fallback;
@@ -86,31 +124,41 @@ class _ReaderPageImageState extends State<ReaderPageImage>
               setState(() {
                 _url = fb;
                 _fellBack = true;
+                _refreshKey++;
               });
             }
           });
-          return Container(
-            height: 200,
-            alignment: Alignment.center,
-            color: placeholderBg,
-            child: const AppleLoadingIndicator(radius: 12),
+          return ReaderBufferingPlaceholder(
+            height: 220,
+            backgroundColor: placeholderBg,
+            pageLabel: pageText,
+            onRefresh: _refresh,
           );
         }
         return InkWell(
           onTap: () async {
             await CachedNetworkImage.evictFromCache(_url);
+            if (mounted) {
+              setState(() {
+                _refreshKey++;
+              });
+            }
             widget.onRetry();
           },
           child: Container(
             height: 200,
             alignment: Alignment.center,
             color: placeholderBg,
-            child: const Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.broken_image_outlined),
-                SizedBox(height: 4),
-                Text('Gagal — ketuk untuk coba lagi'),
+                const Icon(Icons.broken_image_outlined),
+                const SizedBox(height: 4),
+                Text(
+                  pageText != null
+                      ? '$pageText: Gagal — ketuk untuk coba lagi'
+                      : 'Gagal — ketuk untuk coba lagi',
+                ),
               ],
             ),
           ),
@@ -119,4 +167,3 @@ class _ReaderPageImageState extends State<ReaderPageImage>
     );
   }
 }
-

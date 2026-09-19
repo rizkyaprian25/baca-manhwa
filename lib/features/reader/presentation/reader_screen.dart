@@ -10,10 +10,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photo_view/photo_view.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/network/reader_image_headers.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/reader_buffering_placeholder.dart';
 import '../../../core/widgets/reader_image_provider.dart';
 import '../../../core/widgets/reader_page_image.dart';
 import '../../download/presentation/download_provider.dart';
@@ -48,6 +51,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   bool _orientationLocked = false;
   int _total = 0;
   int _lastPrecachePage = -1;
+  Timer? _precacheTimer;
   Ticker? _autoScrollTicker;
   Duration _lastAutoScrollTick = Duration.zero;
   Timer? _clockTimer;
@@ -113,6 +117,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       DeviceOrientation.landscapeRight,
     ]);
     _saveTimer?.cancel();
+    _precacheTimer?.cancel();
     _vCtrl.dispose();
     _hCtrl?.dispose();
     _page.dispose();
@@ -204,21 +209,59 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _precacheFrom(idx);
   }
 
-  // ---------- preload ----------
+  // ---------- preload & refresh ----------
 
   void _precacheFrom(int idx) {
     if (idx == _lastPrecachePage) return;
     _lastPrecachePage = idx;
+    _precacheTimer?.cancel();
+    // Debounce 350ms agar scrolling cepat tidak membombardir socket request
+    _precacheTimer = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      final at = ref.read(atHomeProvider(widget.chapterId)).value;
+      if (at == null) return;
+      final local = ref.read(localPagesProvider(widget.chapterId)).value;
+      final saver = ref.read(dataSaverProvider);
+      final count = AppConstants.readerPreloadPages;
+      for (var i = idx + 1; i <= idx + count && i < at.pageCount; i++) {
+        if (local != null && i < local.length) continue; // sudah lokal
+        final u = at.pageUrl(i, dataSaver: saver);
+        precacheImage(
+          CachedNetworkImageProvider(
+            u,
+            headers: readerImageHeaders(u),
+          ),
+          context,
+        ).catchError((_) {});
+      }
+    });
+  }
+
+  /// Segarkan chapter: bersihkan cache gambar yang menggantung,
+  /// invalidate provider, dan muat ulang halaman.
+  Future<void> _refreshChapter() async {
     final at = ref.read(atHomeProvider(widget.chapterId)).value;
-    if (at == null) return;
-    final local = ref.read(localPagesProvider(widget.chapterId)).value;
     final saver = ref.read(dataSaverProvider);
-    for (var i = idx + 1; i <= idx + 4 && i < at.pageCount; i++) {
-      if (local != null && i < local.length) continue; // sudah lokal
-      precacheImage(
-        CachedNetworkImageProvider(at.pageUrl(i, dataSaver: saver)),
-        context,
-      ).catchError((_) {});
+    if (at != null) {
+      final cur = _page.value;
+      final start = (cur - 2).clamp(0, at.pageCount - 1);
+      final end = (cur + 3).clamp(0, at.pageCount - 1);
+      for (var i = start; i <= end; i++) {
+        final u = at.pageUrl(i, dataSaver: saver);
+        await CachedNetworkImage.evictFromCache(u);
+      }
+    }
+    _lastPrecachePage = -1;
+    ref.invalidate(atHomeProvider(widget.chapterId));
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Menyegarkan chapter & memuat ulang gambar...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      setState(() {});
     }
   }
 
@@ -569,6 +612,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                               ),
                             ],
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'Segarkan chapter',
+                          icon: const Icon(Icons.refresh_rounded),
+                          onPressed: _refreshChapter,
                         ),
                         IconButton(
                           tooltip: 'Tandai posisi',
@@ -946,6 +994,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               child: ReaderPageImage(
                 url: url,
                 localPath: local,
+                pageIndex: i,
                 onRetry: () => setState(() {}),
               ),
             );
@@ -1091,8 +1140,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                   readerImageProvider(url, _localPathFor(localPaths, i)),
               minScale: PhotoViewComputedScale.contained,
               maxScale: PhotoViewComputedScale.covered * 3,
-              loadingBuilder: (c, ev) => const Center(
-                child: AppleLoadingIndicator(radius: 14),
+              loadingBuilder: (c, ev) => ReaderBufferingPlaceholder(
+                pageLabel: 'Hal. ${i + 1}',
+                onRefresh: () async {
+                  await CachedNetworkImage.evictFromCache(url);
+                  if (mounted) setState(() {});
+                },
               ),
               errorBuilder: (_, _, _) => Center(
                 child: Column(
@@ -1100,13 +1153,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                   children: [
                     const Icon(Icons.broken_image_outlined, size: 48),
                     const SizedBox(height: 8),
-                    const Text('Gagal memuat halaman'),
-                    TextButton(
+                    Text('Hal. ${i + 1}: Gagal memuat halaman'),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Coba Lagi'),
                       onPressed: () async {
                         await CachedNetworkImage.evictFromCache(url);
                         if (mounted) setState(() {});
                       },
-                      child: const Text('Coba Lagi'),
                     ),
                   ],
                 ),

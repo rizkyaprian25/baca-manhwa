@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../network/reader_image_headers.dart';
+
 /// Cover manhwa yang ringan, cepat, dan proporsional.
 /// Menggunakan single-pass CachedNetworkImage dengan downsampling (memCacheWidth/Height)
 /// dan perataan topCenter agar karakter/judul tidak terpotong atau over-zoom.
@@ -42,6 +44,7 @@ class CoverImage extends StatelessWidget {
     } else {
       imageWidget = CachedNetworkImage(
         imageUrl: url!,
+        httpHeaders: readerImageHeaders(url!),
         fit: fit,
         alignment: alignment,
         memCacheWidth: memCacheWidth,

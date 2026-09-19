@@ -24,8 +24,8 @@ class AppConstants {
   /// Debounce input pencarian (ms).
   static const int searchDebounceMs = 500;
 
-  /// Jumlah halaman reader yang di-preload ke depan.
-  static const int readerPreloadPages = 4;
+  /// Jumlah halaman reader yang di-preload ke depan (dijaga 2 agar hemat bandwidth & tidak rebutan socket).
+  static const int readerPreloadPages = 2;
 
   /// Ukuran halaman pagination API.
   static const int apiPageSize = 20;

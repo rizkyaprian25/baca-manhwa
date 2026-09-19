@@ -1,3 +1,5 @@
+import 'package:baca_manhwa/core/network/reader_image_headers.dart';
+import 'package:baca_manhwa/core/widgets/reader_buffering_placeholder.dart';
 import 'package:baca_manhwa/core/widgets/reader_page_image.dart';
 import 'package:baca_manhwa/features/settings/presentation/settings_provider.dart';
 import 'package:flutter/material.dart';
@@ -60,6 +62,92 @@ void main() {
 
       // Pastikan widget terpasang
       expect(find.byType(ReaderPageImage), findsOneWidget);
+    });
+  });
+
+  group('Reader HTTP Anti-Throttling Headers Test', () {
+    test('komiku URLs menyertakan Referer https://komiku.org/ dan User-Agent', () {
+      final headers = readerImageHeaders('https://image2.komiku.to/uploads/2024/01/01.jpg');
+      expect(headers['Referer'], equals('https://komiku.org/'));
+      expect(headers['User-Agent'], contains('Chrome'));
+      expect(headers['Accept'], contains('image/webp'));
+    });
+
+    test('img.komiku.org fallback URLs menyertakan Referer komiku', () {
+      final headers = readerImageHeaders('https://img.komiku.org/uploads/2024/01/01.jpg');
+      expect(headers['Referer'], equals('https://komiku.org/'));
+    });
+
+    test('mangadex URLs menyertakan Referer https://mangadex.org/', () {
+      final headers = readerImageHeaders('https://uploads.mangadex.org/data/abc/1.jpg');
+      expect(headers['Referer'], equals('https://mangadex.org/'));
+      expect(headers['User-Agent'], equals('BacaManhwa/1.0 (personal-use)'));
+    });
+
+    test('URL generik memiliki User-Agent dan Accept image', () {
+      final headers = readerImageHeaders('https://cdn.example.com/pic.webp');
+      expect(headers['User-Agent'], isNotEmpty);
+      expect(headers['Accept'], contains('image/'));
+    });
+  });
+
+  group('Reader Buffering Watchdog & Refresh Widget Test', () {
+    testWidgets('ReaderBufferingPlaceholder awalnya tampil tanpa tombol segarkan', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ReaderBufferingPlaceholder(
+              onRefresh: () {},
+              slowThreshold: const Duration(seconds: 2),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Segarkan Gambar'), findsNothing);
+      expect(find.textContaining('Buffering agak lambat'), findsNothing);
+    });
+
+    testWidgets('ReaderBufferingPlaceholder menampilkan tombol Segarkan setelah timeout buffering', (tester) async {
+      bool refreshed = false;
+      bool timedOut = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ReaderBufferingPlaceholder(
+              pageLabel: 'Hal. 1',
+              slowThreshold: const Duration(milliseconds: 100),
+              timeoutThreshold: const Duration(milliseconds: 200),
+              onRefresh: () {
+                refreshed = true;
+              },
+              onTimeout: () {
+                timedOut = true;
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Belum lambat di awal
+      expect(find.text('Segarkan Gambar'), findsNothing);
+
+      // Maju 150ms melampaui slowThreshold dan 350ms untuk transisi AnimatedSwitcher
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.text('Segarkan Gambar'), findsOneWidget);
+      expect(find.textContaining('Hal. 1: Buffering agak lambat'), findsOneWidget);
+
+      // Tekan tombol Segarkan
+      await tester.tap(find.text('Segarkan Gambar'));
+      await tester.pump();
+      expect(refreshed, isTrue);
+
+      // Maju lagi melewati timeoutThreshold
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(timedOut, isTrue);
     });
   });
 }
