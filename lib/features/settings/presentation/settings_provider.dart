@@ -134,3 +134,42 @@ List<String> mergeRecentSearches(
   final out = [q, ...current.where((e) => e.toLowerCase() != q.toLowerCase())];
   return out.take(max).toList();
 }
+
+/// Konversi level kecepatan (1.0 - 10.0) ke laju piksel per detik.
+/// Menggunakan kurva progresif agar perbedaan tiap level terasa nyata dan terukur.
+/// Level 1: ~32 px/s (Sangat Lambat)
+/// Level 5: ~208 px/s (Standar Nyaman)
+/// Level 10: ~720 px/s (Sangat Cepat / Skimming)
+double autoScrollPixelsPerSecond(double level) {
+  final l = level.clamp(1.0, 10.0);
+  return 20.0 + (l * l * 6.5) + (l * 5.0);
+}
+
+/// Label deskriptif untuk level kecepatan auto-scroll.
+String autoScrollSpeedLabel(double level) {
+  final l = level.round().clamp(1, 10);
+  switch (l) {
+    case 1:
+      return 'Level 1 • Sangat Lambat';
+    case 2:
+      return 'Level 2 • Lambat';
+    case 3:
+      return 'Level 3 • Santai';
+    case 4:
+      return 'Level 4 • Sedang-';
+    case 5:
+      return 'Level 5 • Normal';
+    case 6:
+      return 'Level 6 • Sedang+';
+    case 7:
+      return 'Level 7 • Agak Cepat';
+    case 8:
+      return 'Level 8 • Cepat';
+    case 9:
+      return 'Level 9 • Cepat Sekali';
+    case 10:
+    default:
+      return 'Level 10 • Sangat Cepat';
+  }
+}
+

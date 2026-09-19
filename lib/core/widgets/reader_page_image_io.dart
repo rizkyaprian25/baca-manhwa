@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import 'apple_loading.dart';
+
 /// Halaman reader: file lokal bila ada, network bila tidak.
-/// Sekali fallback host image2 -> img untuk Komiku.
+/// Mendukung retensi render (KeepAlive) anti-blink saat scroll balik ke atas,
+/// dan downsampling memCacheWidth hemat memori.
 /// `lib/core/widgets/reader_page_image_io.dart`.
 class ReaderPageImage extends StatefulWidget {
   const ReaderPageImage({
@@ -21,9 +24,13 @@ class ReaderPageImage extends StatefulWidget {
   State<ReaderPageImage> createState() => _ReaderPageImageState();
 }
 
-class _ReaderPageImageState extends State<ReaderPageImage> {
+class _ReaderPageImageState extends State<ReaderPageImage>
+    with AutomaticKeepAliveClientMixin {
   late String _url = widget.url;
   bool _fellBack = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   /// Host cadangan Komiku (sama seperti onerror di situsnya).
   String? get _fallback {
@@ -33,6 +40,8 @@ class _ReaderPageImageState extends State<ReaderPageImage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     final lp = widget.localPath;
     if (lp != null && File(lp).existsSync()) {
       return Image.file(
@@ -41,21 +50,32 @@ class _ReaderPageImageState extends State<ReaderPageImage> {
         fit: BoxFit.fitWidth,
       );
     }
+
+    final mq = MediaQuery.maybeSizeOf(context);
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+    final cacheWidth = mq != null
+        ? ((mq.width * dpr).round()).clamp(720, 1440)
+        : 1080;
+
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final placeholderBg = isDark
+        ? scheme.surfaceContainerLowest
+        : scheme.surfaceContainerHighest.withValues(alpha: 0.3);
+
     return CachedNetworkImage(
       key: ValueKey(_url),
       imageUrl: _url,
       width: double.infinity,
       fit: BoxFit.fitWidth,
-      fadeInDuration: const Duration(milliseconds: 150),
+      memCacheWidth: cacheWidth,
+      fadeInDuration: const Duration(milliseconds: 100),
+      fadeOutDuration: Duration.zero,
       placeholder: (_, _) => Container(
         height: 320,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: placeholderBg,
         child: const Center(
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          child: AppleLoadingIndicator(radius: 12),
         ),
       ),
       errorWidget: (_, _, _) {
@@ -72,11 +92,8 @@ class _ReaderPageImageState extends State<ReaderPageImage> {
           return Container(
             height: 200,
             alignment: Alignment.center,
-            child: const SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+            color: placeholderBg,
+            child: const AppleLoadingIndicator(radius: 12),
           );
         }
         return InkWell(
@@ -87,6 +104,7 @@ class _ReaderPageImageState extends State<ReaderPageImage> {
           child: Container(
             height: 200,
             alignment: Alignment.center,
+            color: placeholderBg,
             child: const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -101,3 +119,4 @@ class _ReaderPageImageState extends State<ReaderPageImage> {
     );
   }
 }
+

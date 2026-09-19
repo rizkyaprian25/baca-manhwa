@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,7 +33,8 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> {
+class _ReaderScreenState extends ConsumerState<ReaderScreen>
+    with SingleTickerProviderStateMixin {
   late String _mode;
   bool _amoled = false;
   bool _showChrome = true;
@@ -45,7 +48,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   bool _orientationLocked = false;
   int _total = 0;
   int _lastPrecachePage = -1;
-  Timer? _autoScrollTimer;
+  Ticker? _autoScrollTicker;
+  Duration _lastAutoScrollTick = Duration.zero;
   Timer? _clockTimer;
   String _clock = '';
 
@@ -326,25 +330,56 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (_mode != 'vertical') return;
     if (_autoScrolling) {
       _stopAutoScroll();
+    } else {
+      _startAutoScroll();
+    }
+  }
+
+  void _startAutoScroll() {
+    if (_mode != 'vertical' || _autoScrolling) return;
+    setState(() => _autoScrolling = true);
+    _lastAutoScrollTick = Duration.zero;
+    _autoScrollTicker?.dispose();
+    _autoScrollTicker = createTicker(_onAutoScrollTick);
+    _autoScrollTicker?.start();
+  }
+
+  void _onAutoScrollTick(Duration elapsed) {
+    if (!mounted || !_vCtrl.hasClients) {
+      _stopAutoScroll();
       return;
     }
-    setState(() => _autoScrolling = true);
-    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
-      if (!mounted || !_vCtrl.hasClients) return;
-      final step = ref.read(autoScrollSpeedProvider);
-      final max = _vCtrl.position.maxScrollExtent;
-      final next = _vCtrl.offset + step;
-      if (next >= max) {
-        _stopAutoScroll();
-        return;
-      }
-      _vCtrl.jumpTo(next);
-    });
+
+    if (_lastAutoScrollTick == Duration.zero) {
+      _lastAutoScrollTick = elapsed;
+      return;
+    }
+
+    final dtMicroseconds = (elapsed - _lastAutoScrollTick).inMicroseconds;
+    _lastAutoScrollTick = elapsed;
+
+    // Proteksi delta time (clamp antara 1ms sampai 50ms jika frame drop)
+    final dt = (dtMicroseconds / 1000000.0).clamp(0.001, 0.05);
+
+    final speedLevel = ref.read(autoScrollSpeedProvider);
+    final pxPerSec = autoScrollPixelsPerSecond(speedLevel);
+    final delta = pxPerSec * dt;
+
+    final max = _vCtrl.position.maxScrollExtent;
+    final next = _vCtrl.offset + delta;
+    if (next >= max) {
+      _vCtrl.jumpTo(max);
+      _stopAutoScroll();
+      return;
+    }
+    _vCtrl.jumpTo(next);
   }
 
   void _stopAutoScroll() {
-    _autoScrollTimer?.cancel();
-    _autoScrollTimer = null;
+    _autoScrollTicker?.stop();
+    _autoScrollTicker?.dispose();
+    _autoScrollTicker = null;
+    _lastAutoScrollTick = Duration.zero;
     if (_autoScrolling && mounted) {
       setState(() => _autoScrolling = false);
     } else {
@@ -428,12 +463,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ),
             ),
           if (_showResumeBanner) _resumeBanner(),
+          if (_autoScrolling) _floatingAutoScrollHud(),
           if (_showChrome) ...[
             _topHud(),
             _pagePill(),
             _bottomController(),
-          ] else
+          ] else ...[
             _pagePill(),
+          ],
         ],
       ),
     );
@@ -571,9 +608,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   /// Pil penghitung halaman (selalu terlihat).
   Widget _pagePill() {
     final scheme = Theme.of(context).colorScheme;
+    final pillBottom = _showChrome ? 316.0 : (_autoScrolling ? 88.0 : 24.0);
     return Positioned(
       right: 16,
-      bottom: _showChrome ? 316 : 24,
+      bottom: pillBottom,
       child: IgnorePointer(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -729,6 +767,105 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  /// HUD mini mengambang saat auto-scroll aktif (Apple Liquid Glass pill).
+  Widget _floatingAutoScrollHud() {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentSpeed = ref.watch(autoScrollSpeedProvider).clamp(1.0, 10.0);
+
+    return Positioned(
+      bottom: _showChrome ? 170 : 28,
+      left: 20,
+      right: 20,
+      child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xCC1C1C1E)
+                    : const Color(0xE6FFFFFF),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0x33FFFFFF)
+                      : const Color(0x1F000000),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Hentikan Scroll',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.pause, color: scheme.primary),
+                    onPressed: _stopAutoScroll,
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Perlambat',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.remove, size: 18),
+                    onPressed: currentSpeed > 1.0
+                        ? () => ref
+                            .read(settingsActionsProvider)
+                            .setAutoScrollSpeed(currentSpeed - 1.0)
+                        : null,
+                  ),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 105),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      autoScrollSpeedLabel(currentSpeed),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Percepat',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.add, size: 18),
+                    onPressed: currentSpeed < 10.0
+                        ? () => ref
+                            .read(settingsActionsProvider)
+                            .setAutoScrollSpeed(currentSpeed + 1.0)
+                        : null,
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Tutup',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    onPressed: _stopAutoScroll,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _readerBody({required AtHome atHome, required VoidCallback onReady}) {
     if (_total != atHome.pageCount) _total = atHome.pageCount;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -783,11 +920,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       },
       child: NotificationListener<ScrollNotification>(
         onNotification: (n) {
+          if (n is UserScrollNotification &&
+              n.direction != ScrollDirection.idle) {
+            if (_autoScrolling) {
+              _stopAutoScroll();
+            }
+          }
           if (n is ScrollEndNotification) _scheduleVSave();
           return false;
         },
         child: ListView.builder(
           controller: _vCtrl,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(2000.0),
+          addAutomaticKeepAlives: true,
+          addRepaintBoundaries: true,
           itemCount: atHome.pageCount + 1,
           itemBuilder: (ctx, i) {
             if (i == atHome.pageCount) return _footer();
@@ -939,33 +1085,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         onPageChanged: (i) => _savePage(i),
         itemBuilder: (ctx, i) {
           final url = atHome.pageUrl(i, dataSaver: saver);
-          return PhotoView(
-            imageProvider:
-                readerImageProvider(url, _localPathFor(localPaths, i)),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 3,
-            loadingBuilder: (c, ev) => Center(
-              child: CircularProgressIndicator(
-                value: ev == null || ev.expectedTotalBytes == null
-                    ? null
-                    : ev.cumulativeBytesLoaded / ev.expectedTotalBytes!,
+          return _HorizontalPageKeepAlive(
+            child: PhotoView(
+              imageProvider:
+                  readerImageProvider(url, _localPathFor(localPaths, i)),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 3,
+              loadingBuilder: (c, ev) => const Center(
+                child: AppleLoadingIndicator(radius: 14),
               ),
-            ),
-            errorBuilder: (_, _, _) => Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.broken_image_outlined, size: 48),
-                  const SizedBox(height: 8),
-                  const Text('Gagal memuat halaman'),
-                  TextButton(
-                    onPressed: () async {
-                      await CachedNetworkImage.evictFromCache(url);
-                      if (mounted) setState(() {});
-                    },
-                    child: const Text('Coba Lagi'),
-                  ),
-                ],
+              errorBuilder: (_, _, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.broken_image_outlined, size: 48),
+                    const SizedBox(height: 8),
+                    const Text('Gagal memuat halaman'),
+                    TextButton(
+                      onPressed: () async {
+                        await CachedNetworkImage.evictFromCache(url);
+                        if (mounted) setState(() {});
+                      },
+                      child: const Text('Coba Lagi'),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -1036,7 +1180,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ),
               SwitchListTile(
                 title: const Text('Scroll otomatis'),
-                subtitle: const Text('Mode vertikal'),
+                subtitle: const Text('Mode vertikal • Ticker VSync mulus'),
                 value: _autoScrolling,
                 onChanged: _mode == 'vertical'
                     ? (_) {
@@ -1058,9 +1202,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                             child: Text('Kecepatan scroll otomatis'),
                           ),
                           Text(
-                            s <= 3
-                                ? 'Lambat'
-                                : (s <= 6 ? 'Sedang' : 'Cepat'),
+                            autoScrollSpeedLabel(s),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -1069,7 +1212,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                         min: 1,
                         max: 10,
                         divisions: 9,
-                        label: '${s.round()}',
+                        label: autoScrollSpeedLabel(s),
                         onChanged: (v) => ref2
                             .read(settingsActionsProvider)
                             .setAutoScrollSpeed(v),
@@ -1127,6 +1270,29 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 }
+
+/// Pembungkus KeepAlive untuk halaman horizontal agar tidak re-render saat swipe mundur.
+class _HorizontalPageKeepAlive extends StatefulWidget {
+  const _HorizontalPageKeepAlive({required this.child});
+  final Widget child;
+
+  @override
+  State<_HorizontalPageKeepAlive> createState() =>
+      _HorizontalPageKeepAliveState();
+}
+
+class _HorizontalPageKeepAliveState extends State<_HorizontalPageKeepAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 
 /// Satu halaman vertikal full-width (+ retry) — pindah ke
 /// `lib/core/widgets/reader_page_image.dart` (varian IO/Web) — Fase 5.
