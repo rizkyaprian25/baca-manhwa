@@ -6,12 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/database/app_database.dart';
+import '../core/database/tables/library_entries.dart';
 import '../core/providers/database_provider.dart';
 
-/// Backup & restore JSON — tanpa dart:io (aman Web).
-/// Isi: settings, library, cache mangas, chapters (+progress baca), history.
+/// Backup & restore JSON — tanpa dart:io (aman Web & Mobile).
+/// Isi: settings (v1-v5), library, cache mangas, chapters (+progress baca), history.
 /// TIDAK termasuk file unduhan (unduh ulang setelah restore).
-/// Import bersifat upsert (tidak menghapus data lokal).
+/// Import bersifat upsert toleran dan tahan terhadap perubahan skema (resilient).
 /// `lib/services/backup_service.dart`.
 class BackupService {
   BackupService(this._ref);
@@ -19,15 +20,17 @@ class BackupService {
 
   AppDatabase get _db => _ref.read(databaseProvider);
 
+  /// Ekspor seluruh data lokal ke Map JSON yang kompatibel maju dan mundur.
   Future<Map<String, dynamic>> buildBackup() async {
     final s = await _db.getSettings();
     final library = await _db.select(_db.libraryEntries).get();
     final mangas = await _db.select(_db.mangas).get();
     final chapters = await _db.select(_db.chapters).get();
     final history = await _db.select(_db.readingHistory).get();
+
     return {
       'app': 'baca_manhwa',
-      'backupVersion': 1,
+      'backupVersion': 2,
       'exportedAt': DateTime.now().toIso8601String(),
       'settings': {
         'theme': s.theme,
@@ -36,6 +39,9 @@ class BackupService {
         'dataSaver': s.dataSaver,
         'readDirection': s.readDirection,
         'brightness': s.brightness,
+        'source': s.source,
+        'recentSearches': s.recentSearches,
+        'autoScrollSpeed': s.autoScrollSpeed,
       },
       'library': [
         for (final e in library)
@@ -89,8 +95,11 @@ class BackupService {
     };
   }
 
-  static int _count(Map<String, dynamic> json, String key) =>
-      ((json[key] as List?) ?? []).length;
+  static int _count(Map<String, dynamic> json, String key) {
+    final val = json[key];
+    if (val is List) return val.length;
+    return 0;
+  }
 
   static String summaryOf(Map<String, dynamic> json) =>
       'Pustaka: ${_count(json, 'library')} • Judul: ${_count(json, 'mangas')}'
@@ -116,121 +125,253 @@ class BackupService {
   }
 
   /// Pilih file .json backup → isi sebagai String (null bila batal).
+  /// Mendukung pembacaan bytes langsung (Web/Desktop) dan XFile streaming (Mobile).
   Future<String?> pickBackupString() async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-    if (file == null) return null;
-    final bytes = await file.readAsBytes();
-    return utf8.decode(bytes);
+    try {
+      final file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (file == null) return null;
+      final bytes = await file.readAsBytes();
+      return utf8.decode(bytes);
+    } catch (_) {
+      return null;
+    }
   }
 
-  /// Import upsert dari String JSON. Melempar [FormatException] bila invalid.
+  // Helper parsing defensif
+  static int? _parseInt(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toInt();
+    if (val is String) return int.tryParse(val.trim());
+    return null;
+  }
+
+  static double? _parseDouble(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val.trim());
+    return null;
+  }
+
+  static bool _parseBool(dynamic val, {bool defaultValue = false}) {
+    if (val == null) return defaultValue;
+    if (val is bool) return val;
+    if (val == 1 || val == '1' || val == 'true') return true;
+    if (val == 0 || val == '0' || val == 'false') return false;
+    return defaultValue;
+  }
+
+  static String? _parseStringOrJson(dynamic val) {
+    if (val == null) return null;
+    if (val is String) return val;
+    if (val is List || val is Map) {
+      try {
+        return jsonEncode(val);
+      } catch (_) {
+        return val.toString();
+      }
+    }
+    return val.toString();
+  }
+
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    final str = val.toString().trim();
+    if (str.isEmpty || str == 'null') return null;
+    return DateTime.tryParse(str);
+  }
+
+  /// Import upsert dari String JSON.
+  /// Sangat defensif terhadap type casting, data yatim, dan foreign key constraints.
   Future<BackupSummary> importJsonString(String text) async {
-    final decoded = jsonDecode(text);
-    if (decoded is! Map<String, dynamic> || decoded['app'] != 'baca_manhwa') {
+    final dynamic decoded = jsonDecode(text);
+    if (decoded is! Map) {
+      throw const FormatException('Bukan file JSON yang valid');
+    }
+    if (decoded['app'] != 'baca_manhwa' &&
+        decoded['backupVersion'] == null &&
+        decoded['mangas'] == null) {
       throw const FormatException('Bukan file backup Baca Manhwa');
     }
-    final json = decoded;
+
+    final json = Map<String, dynamic>.from(decoded);
     var lib = 0, man = 0, ch = 0, his = 0;
 
+    // 1. Mangas
     final mangas = (json['mangas'] as List?) ?? [];
-    if (mangas.isNotEmpty) {
+    final validMangas = mangas.whereType<Map>().where((m) {
+      final id = m['id']?.toString().trim();
+      return id != null && id.isNotEmpty;
+    }).toList();
+
+    if (validMangas.isNotEmpty) {
       await _db.batch((b) {
         b.insertAllOnConflictUpdate(
           _db.mangas,
-          mangas.whereType<Map>().map(
-                (m) => MangasCompanion(
-                  id: Value('${m['id']}'),
-                  title: Value('${m['title']}'),
-                  altTitles: Value(m['altTitles'] as String?),
-                  description: Value(m['description'] as String?),
-                  status: Value(m['status'] as String?),
-                  contentRating: Value(m['contentRating'] as String?),
-                  year: Value((m['year'] as num?)?.toInt()),
-                  coverUrl: Value(m['coverUrl'] as String?),
-                  tags: Value(m['tags'] as String?),
-                  author: Value(m['author'] as String?),
-                  artist: Value(m['artist'] as String?),
-                  lastFetched: Value(DateTime.now()),
-                ),
-              ),
+          validMangas.map(
+            (m) => MangasCompanion(
+              id: Value(m['id'].toString().trim()),
+              title: Value(m['title']?.toString() ?? 'Tanpa Judul'),
+              altTitles: Value(_parseStringOrJson(m['altTitles'])),
+              description: Value(m['description']?.toString()),
+              status: Value(m['status']?.toString()),
+              contentRating: Value(m['contentRating']?.toString()),
+              year: Value(_parseInt(m['year'])),
+              coverUrl: Value(m['coverUrl']?.toString()),
+              tags: Value(_parseStringOrJson(m['tags'])),
+              author: Value(m['author']?.toString()),
+              artist: Value(m['artist']?.toString()),
+              lastFetched: Value(DateTime.now()),
+            ),
+          ),
         );
       });
-      man = mangas.length;
+      man = validMangas.length;
     }
 
-    final chapters = (json['chapters'] as List?) ?? [];
-    final mangaIds = mangas
-        .whereType<Map>()
-        .map((m) => '${m['id']}')
+    // Ambil seluruh ID manga yang ada di DB (mencegah Foreign Key constraint crash)
+    final allMangaIds = (await (_db.selectOnly(_db.mangas)..addColumns([_db.mangas.id])).get())
+        .map((r) => r.read(_db.mangas.id)!)
         .toSet();
-    final validChapters = chapters
-        .whereType<Map>()
-        .where((c) => mangaIds.contains('${c['mangaId']}'))
-        .toList();
+
+    // 2. Chapters (hanya yang memiliki parent mangaId valid)
+    final chapters = (json['chapters'] as List?) ?? [];
+    final validChapters = chapters.whereType<Map>().where((c) {
+      final cid = c['id']?.toString().trim();
+      final mid = c['mangaId']?.toString().trim();
+      return cid != null && cid.isNotEmpty && mid != null && allMangaIds.contains(mid);
+    }).toList();
+
     if (validChapters.isNotEmpty) {
       await _db.batch((b) {
         b.insertAllOnConflictUpdate(
           _db.chapters,
           validChapters.map(
-                (c) => ChaptersCompanion(
-                  id: Value('${c['id']}'),
-                  mangaId: Value('${c['mangaId']}'),
-                  title: Value(c['title'] as String?),
-                  chapterNo: Value(c['chapterNo'] as String?),
-                  volume: Value(c['volume'] as String?),
-                  language: Value('${c['language'] ?? 'en'}'),
-                  pages: Value((c['pages'] as num?)?.toInt() ?? 0),
-                  readableAt: Value(
-                    DateTime.tryParse('${c['readableAt']}'),
-                  ),
-                  isRead: Value(c['isRead'] == true),
-                  lastPage: Value((c['lastPage'] as num?)?.toInt() ?? 0),
-                ),
-              ),
+            (c) => ChaptersCompanion(
+              id: Value(c['id'].toString().trim()),
+              mangaId: Value(c['mangaId'].toString().trim()),
+              title: Value(c['title']?.toString()),
+              chapterNo: Value(c['chapterNo']?.toString()),
+              volume: Value(c['volume']?.toString()),
+              language: Value(c['language']?.toString() ?? 'en'),
+              pages: Value(_parseInt(c['pages']) ?? 0),
+              readableAt: Value(_parseDateTime(c['readableAt'])),
+              isRead: Value(_parseBool(c['isRead'])),
+              lastPage: Value(_parseInt(c['lastPage']) ?? 0),
+            ),
+          ),
         );
       });
       ch = validChapters.length;
     }
 
+    final allChapterIds = (await (_db.selectOnly(_db.chapters)..addColumns([_db.chapters.id])).get())
+        .map((r) => r.read(_db.chapters.id)!)
+        .toSet();
+
+    // 3. Library (pertahankan addedAt dan lastOpened historis tanpa crash FK)
     final library = (json['library'] as List?) ?? [];
     for (final e in library.whereType<Map>()) {
-      final mangaId = '${e['mangaId']}';
-      final listType = '${e['listType']}';
-      if (mangaId.isEmpty) continue;
-      await _db.addToLibrary(mangaId, listType);
-      lib++;
+      final mangaId = e['mangaId']?.toString().trim();
+      final listType = e['listType']?.toString().trim();
+      if (mangaId == null || mangaId.isEmpty || !allMangaIds.contains(mangaId)) {
+        continue;
+      }
+      if (listType == null || !LibraryList.all.contains(listType)) {
+        continue;
+      }
+
+      final addedAt = _parseDateTime(e['addedAt']) ?? DateTime.now();
+      final lastOpened = _parseDateTime(e['lastOpened']);
+
+      try {
+        final existing = await (_db.select(_db.libraryEntries)
+              ..where((t) => t.mangaId.equals(mangaId) & t.listType.equals(listType)))
+            .getSingleOrNull();
+
+        if (existing == null) {
+          await _db.into(_db.libraryEntries).insert(
+                LibraryEntriesCompanion.insert(
+                  mangaId: mangaId,
+                  listType: listType,
+                  addedAt: Value(addedAt),
+                  lastOpened: lastOpened != null ? Value(lastOpened) : const Value.absent(),
+                ),
+              );
+        } else if (lastOpened != null) {
+          await (_db.update(_db.libraryEntries)..where((t) => t.id.equals(existing.id))).write(
+            LibraryEntriesCompanion(
+              lastOpened: Value(lastOpened),
+            ),
+          );
+        }
+        lib++;
+      } catch (_) {
+        // Abaikan duplikasi atau constraint error terisolasi
+      }
     }
 
+    // 4. Settings (dukung semua pengaturan baru: theme, speed, source, recentSearches)
     final settings = json['settings'];
     if (settings is Map) {
-      await _db.updateSettings(
-        AppSettingsCompanion(
-          theme: Value('${settings['theme'] ?? 'system'}'),
-          chapterLang: Value('${settings['chapterLang'] ?? 'id'}'),
-          adultFilter: Value(settings['adultFilter'] != false),
-          dataSaver: Value(settings['dataSaver'] == true),
-          readDirection: Value('${settings['readDirection'] ?? 'vertical'}'),
-          brightness: Value((settings['brightness'] as num?)?.toDouble()),
-        ),
-      );
+      try {
+        final themeVal = settings['theme']?.toString();
+        final theme = (themeVal == 'light' || themeVal == 'dark' || themeVal == 'system')
+            ? themeVal!
+            : 'dark';
+        final speed = _parseDouble(settings['autoScrollSpeed']) ?? 4.0;
+        final recent = _parseStringOrJson(settings['recentSearches']) ?? '[]';
+        final source = settings['source'] == 'mangadex' ? 'mangadex' : 'komiku';
+        final lang = settings['chapterLang']?.toString() ?? 'id';
+        final adult = _parseBool(settings['adultFilter'], defaultValue: true);
+        final dataSaver = _parseBool(settings['dataSaver'], defaultValue: false);
+        final readDir = settings['readDirection']?.toString() ?? 'vertical';
+        final brightness = _parseDouble(settings['brightness']);
+
+        await _db.updateSettings(
+          AppSettingsCompanion(
+            theme: Value(theme),
+            chapterLang: Value(lang),
+            adultFilter: Value(adult),
+            dataSaver: Value(dataSaver),
+            readDirection: Value(readDir),
+            brightness: Value(brightness),
+            source: Value(source),
+            recentSearches: Value(recent),
+            autoScrollSpeed: Value(speed),
+          ),
+        );
+      } catch (_) {
+        // Gagal parsial settings tidak menggagalkan seluruh import data buku
+      }
     }
 
+    // 5. History
     final history = (json['history'] as List?) ?? [];
     for (final h in history.whereType<Map>()) {
+      final mangaId = h['mangaId']?.toString().trim();
+      final chapterId = h['chapterId']?.toString().trim();
+      if (mangaId == null || !allMangaIds.contains(mangaId)) continue;
+      if (chapterId == null || !allChapterIds.contains(chapterId)) continue;
+
+      final page = _parseInt(h['page']) ?? 0;
+      final readAt = _parseDateTime(h['readAt']) ?? DateTime.now();
+
       try {
         await _db.into(_db.readingHistory).insert(
               ReadingHistoryCompanion.insert(
-                mangaId: '${h['mangaId']}',
-                chapterId: '${h['chapterId']}',
-                page: Value((h['page'] as num?)?.toInt() ?? 0),
+                mangaId: mangaId,
+                chapterId: chapterId,
+                page: Value(page),
+                readAt: Value(readAt),
               ),
             );
         his++;
       } catch (_) {
-        // Baris yatim (chapter tidak ada) dilewati.
+        // Baris yatim / duplikat dilewati tanpa memutus proses
       }
     }
 
