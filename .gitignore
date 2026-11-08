@@ -78,6 +78,12 @@ build/debug-info/
 .claude/
 .opencode/
 opencode.json
+mcp.json
+.mcp.json
+*.mcp.json
+mcp_config.json
+.mcp/
+Agents_Update/
 .windsurf/
 .codeium/
 .aider*
