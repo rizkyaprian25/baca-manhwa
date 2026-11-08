@@ -1,9 +1,11 @@
 import 'package:drift/drift.dart';
 
 /// Cache metadata judul — `lib/core/database/tables/mangas.dart`.
-/// id = UUID MangaDex (TEXT PK, bukan auto-increment).
+/// id = format `source:slug` (mis. `k:solo-leveling`) atau UUID MangaDex.
 class Mangas extends Table {
   TextColumn get id => text()();
+  TextColumn get source => text().withDefault(const Constant('komiku'))();
+  TextColumn get origin => text().withDefault(const Constant('other'))();
   TextColumn get title => text()();
   TextColumn get altTitles => text().nullable()(); // JSON array string
   TextColumn get description => text().nullable()();

@@ -4,6 +4,7 @@ import '../entities/manga.dart';
 class MangaFilter {
   const MangaFilter({
     this.title = '',
+    this.origin,
     this.includedTags = const [],
     this.status = const [],
     this.contentRating = const ['safe', 'suggestive'],
@@ -14,6 +15,7 @@ class MangaFilter {
   });
 
   final String title;
+  final MangaOrigin? origin;
   final List<String> includedTags;
   final List<String> status;
   final List<String> contentRating;
@@ -23,6 +25,8 @@ class MangaFilter {
 
   MangaFilter copyWith({
     String? title,
+    MangaOrigin? origin,
+    bool clearOrigin = false,
     List<String>? includedTags,
     List<String>? status,
     List<String>? contentRating,
@@ -33,6 +37,7 @@ class MangaFilter {
   }) =>
       MangaFilter(
         title: title ?? this.title,
+        origin: clearOrigin ? null : (origin ?? this.origin),
         includedTags: includedTags ?? this.includedTags,
         status: status ?? this.status,
         contentRating: contentRating ?? this.contentRating,

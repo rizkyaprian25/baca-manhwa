@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../core/database/app_database.dart';
 import '../core/database/tables/library_entries.dart';
 import '../core/providers/database_provider.dart';
+import '../core/sources/source_id.dart';
 
 /// Backup & restore JSON — tanpa dart:io (aman Web & Mobile).
 /// Isi: settings (v1-v5), library, cache mangas, chapters (+progress baca), history.
@@ -30,8 +31,9 @@ class BackupService {
 
     return {
       'app': 'baca_manhwa',
-      'backupVersion': 2,
+      'backupVersion': 3,
       'exportedAt': DateTime.now().toIso8601String(),
+      'sources': ['komiku', 'mangadex'],
       'settings': {
         'theme': s.theme,
         'chapterLang': s.chapterLang,
@@ -56,6 +58,8 @@ class BackupService {
         for (final m in mangas)
           {
             'id': m.id,
+            'source': m.source,
+            'origin': m.origin,
             'title': m.title,
             'altTitles': m.altTitles,
             'description': m.description,
@@ -212,20 +216,30 @@ class BackupService {
         b.insertAllOnConflictUpdate(
           _db.mangas,
           validMangas.map(
-            (m) => MangasCompanion(
-              id: Value(m['id'].toString().trim()),
-              title: Value(m['title']?.toString() ?? 'Tanpa Judul'),
-              altTitles: Value(_parseStringOrJson(m['altTitles'])),
-              description: Value(m['description']?.toString()),
-              status: Value(m['status']?.toString()),
-              contentRating: Value(m['contentRating']?.toString()),
-              year: Value(_parseInt(m['year'])),
-              coverUrl: Value(m['coverUrl']?.toString()),
-              tags: Value(_parseStringOrJson(m['tags'])),
-              author: Value(m['author']?.toString()),
-              artist: Value(m['artist']?.toString()),
-              lastFetched: Value(DateTime.now()),
-            ),
+            (m) {
+              final mid = m['id'].toString().trim();
+              final rawSource = m['source']?.toString().trim();
+              final source = (rawSource != null && rawSource.isNotEmpty)
+                  ? rawSource
+                  : SourceId.fromMangaId(mid);
+              final rawOrigin = m['origin']?.toString().trim() ?? 'other';
+              return MangasCompanion(
+                id: Value(mid),
+                source: Value(source),
+                origin: Value(rawOrigin),
+                title: Value(m['title']?.toString() ?? 'Tanpa Judul'),
+                altTitles: Value(_parseStringOrJson(m['altTitles'])),
+                description: Value(m['description']?.toString()),
+                status: Value(m['status']?.toString()),
+                contentRating: Value(m['contentRating']?.toString()),
+                year: Value(_parseInt(m['year'])),
+                coverUrl: Value(m['coverUrl']?.toString()),
+                tags: Value(_parseStringOrJson(m['tags'])),
+                author: Value(m['author']?.toString()),
+                artist: Value(m['artist']?.toString()),
+                lastFetched: Value(DateTime.now()),
+              );
+            },
           ),
         );
       });

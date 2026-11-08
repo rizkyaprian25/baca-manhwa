@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/number_formatter.dart';
 import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/apple_bounce_tap.dart';
 import '../../../core/widgets/apple_loading.dart';
 import '../../../core/widgets/cover_image.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/origin_flag_badge.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../history/presentation/history_provider.dart';
 import '../../library/presentation/library_actions.dart';
@@ -172,6 +174,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
             SliverToBoxAdapter(child: _ContinueReading()),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            SliverToBoxAdapter(child: _RecommendationSection()),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
             SliverToBoxAdapter(child: _LatestGrid()),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -635,6 +639,152 @@ class _ContinueReading extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Seksi Rekomendasi Spesial Untukmu (fitur v1.1):
+/// Menampilkan komik pilihan berbasis riwayat baca & preferensi pengguna
+/// dengan kartu poster horizontal, badge bendera negara, dan rating.
+class _RecommendationSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncRecs = ref.watch(recommendedProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 20, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Rekomendasi Untukmu',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () => context.push('/search'),
+                child: const Text('Lihat Semua'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        asyncRecs.when(
+          data: (items) {
+            if (items.isEmpty) return const SizedBox.shrink();
+            return SizedBox(
+              height: 220,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (ctx, i) {
+                  final m = items[i];
+                  return AppleBounceTap(
+                    onTap: () => context.push('/manga/${m.id}'),
+                    child: SizedBox(
+                      width: 110,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CoverImage(
+                                    url: m.coverUrl,
+                                    aspectRatio: 2 / 3,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                if (m.origin != MangaOrigin.other)
+                                  Positioned(
+                                    top: 6,
+                                    left: 6,
+                                    child: OriginFlagBadge(origin: m.origin),
+                                  ),
+                                if (m.rating != null)
+                                  Positioned(
+                                    top: 6,
+                                    right: 6,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.75),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            size: 10,
+                                            color: Colors.amber,
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            m.rating!.toStringAsFixed(1),
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            m.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            m.latestChapter != null && m.latestChapter!.isNotEmpty
+                                ? 'Ch. ${m.latestChapter}'
+                                : m.statusLabel(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 }

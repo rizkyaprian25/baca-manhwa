@@ -95,6 +95,11 @@ chatgpt/
 *.agent
 *.agents
 
+# ===== Design Files (Pen.dev and canvas designs) =====
+design/
+*.pen
+**/*.pen
+
 # ===== Markdown Files (Kecualikan semua file .md dari Git kecuali README.md) =====
 *.md
 **/*.md

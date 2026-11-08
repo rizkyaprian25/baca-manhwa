@@ -26,6 +26,12 @@ class MangadexRemoteDataSource {
     int offset = 0,
   }) =>
       _guard(() async {
+        final origLangs = switch (filter.origin) {
+          MangaOrigin.jp => const ['ja'],
+          MangaOrigin.kr => const ['ko'],
+          MangaOrigin.cn => const ['zh'],
+          _ => null,
+        };
         final json = await _api.getMangaList(
           title: filter.title,
           includedTags: filter.includedTags,
@@ -36,6 +42,7 @@ class MangadexRemoteDataSource {
           limit: limit,
           offset: offset,
           translatedLanguage: filter.languages,
+          originalLanguage: origLangs,
         );
         final items = mangaListFromJson(json);
         final total = (json['total'] as int?) ?? items.length;

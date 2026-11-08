@@ -48,6 +48,15 @@ class MangaFilterNotifier extends Notifier<MangaFilter> {
     );
   }
 
+  void setOrigin(MangaOrigin? o) {
+    if (state.origin == o) return;
+    if (o == null) {
+      state = state.copyWith(clearOrigin: true);
+    } else {
+      state = state.copyWith(origin: o);
+    }
+  }
+
   void setTitle(String v) {
     if (state.title == v) return;
     state = state.copyWith(title: v);
@@ -136,12 +145,15 @@ class SearchState {
       );
 }
 
-/// Hasil pencarian + infinite scroll (10 per muat).
-/// Gabung halaman via `mergeSearchPage` bersama (manga_providers).
+/// Hasil pencarian + infinite scroll tangguh anti-mentok (20 per muat).
+/// Menggunakan kursor request offset independen dari ukuran list item unik,
+/// sehingga deduplikasi tidak mematikan paginasi secara prematur.
 class SearchResultsNotifier extends Notifier<SearchState> {
-  /// Generasi request: respons basi (mis. search lama yang selesai belakangan
-  /// menimpa hasil search baru) dibuang — anti "nempel"/hasil salah.
+  /// Generasi request: respons basi dibuang — anti balapan / hasil salah.
   int _gen = 0;
+
+  /// Kursor offset request yang diajukan ke server (independen dari dedupe UI).
+  int _serverOffset = 0;
 
   @override
   SearchState build() => const SearchState();
@@ -149,16 +161,18 @@ class SearchResultsNotifier extends Notifier<SearchState> {
   Future<void> search() async {
     final myGen = ++_gen;
     final filter = ref.read(searchFilterProvider);
+    _serverOffset = 0;
     state = const SearchState(isLoading: true);
     try {
       final page = await ref
           .read(mangaRepositoryProvider)
-          .search(filter, limit: 20);
+          .search(filter, limit: 20, offset: 0);
       if (myGen != _gen) return;
+      _serverOffset = page.items.length;
       state = SearchState(
         items: page.items,
         total: page.total,
-        hasMore: page.hasMore,
+        hasMore: page.hasMore && page.items.isNotEmpty,
       );
     } catch (e) {
       if (myGen != _gen) return;
@@ -175,22 +189,27 @@ class SearchResultsNotifier extends Notifier<SearchState> {
     final filter = ref.read(searchFilterProvider);
     state = s.copyWith(isLoadingMore: true);
     try {
+      final requestOffset = _serverOffset > 0 ? _serverOffset : s.items.length;
       final page = await ref.read(mangaRepositoryProvider).search(
             filter,
             limit: 20,
-            offset: s.items.length,
+            offset: requestOffset,
           );
       if (myGen != _gen) return;
-      final merged = mergeSearchPage(s.items, page);
+      _serverOffset = requestOffset + page.items.length;
+
+      // Deduplikasi berbasis Set ID
+      final known = s.items.map((m) => m.id).toSet();
+      final fresh = page.items.where((m) => known.add(m.id)).toList();
+
       state = s.copyWith(
-        items: merged.items,
-        total: page.total,
-        hasMore: merged.hasMore,
+        items: [...s.items, ...fresh],
+        total: page.total > s.total ? page.total : s.total + fresh.length,
+        hasMore: page.hasMore && page.items.isNotEmpty,
         isLoadingMore: false,
       );
     } catch (_) {
       if (myGen != _gen) return;
-      // List lama dipertahankan; scroll berikutnya bisa retry.
       state = s.copyWith(isLoadingMore: false);
     }
   }

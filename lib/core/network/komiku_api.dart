@@ -13,20 +13,23 @@ class KomikuApi {
   static const int pageSize = 10;
 
   /// Daftar pustaka: orderby modified (terbaru) | date (rilis) |
-  /// meta_value_num (peringkat). Paginasi server Komiku menggunakan path
-  /// `/manga/page/{n}/` (sesuai HTMX pagination asli komiku.org).
+  /// meta_value_num (peringkat). Mendukung filter tipe (manga/manhwa/manhua).
+  /// Paginasi server Komiku menggunakan path `/manga/page/{n}/`.
   Future<String> listPage({
     String orderby = 'modified',
     String? sorttime,
     String? genre,
     String? genre2,
     String? status,
+    String? tipe = 'manhwa',
     int page = 1,
   }) async {
     final params = <String, dynamic>{
-      'tipe': 'manhwa',
       'orderby': orderby,
     };
+    if (tipe != null && tipe.isNotEmpty && tipe != 'all') {
+      params['tipe'] = tipe;
+    }
     if (sorttime != null) params['sorttime'] = sorttime;
     if (genre != null && genre.isNotEmpty) params['genre'] = genre;
     if (genre2 != null && genre2.isNotEmpty) params['genre2'] = genre2;
@@ -39,13 +42,20 @@ class KomikuApi {
     return res.data ?? '';
   }
 
-  /// Search judul: mendukung paginasi server via parameter `paged`.
-  Future<String> searchPage(String query, {int page = 1}) async {
+  /// Search judul: mendukung paginasi server via parameter `paged`
+  /// dan filter tipe komik (manga/manhwa/manhua/all).
+  Future<String> searchPage(
+    String query, {
+    String? tipe,
+    int page = 1,
+  }) async {
     final params = <String, dynamic>{
       'post_type': 'manga',
       's': query,
-      'tipe': 'manhwa',
     };
+    if (tipe != null && tipe.isNotEmpty && tipe != 'all') {
+      params['tipe'] = tipe;
+    }
     if (page > 1) {
       params['paged'] = page;
     }

@@ -59,6 +59,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           title: const AppLogo(),
           actions: [
             IconButton(
+              tooltip: 'Cadangan & Pemulihan v3',
+              icon: const Icon(Icons.cloud_sync_outlined),
+              onPressed: () => context.push('/settings'),
+            ),
+            IconButton(
               tooltip: 'Unduhan offline',
               icon: const Icon(Icons.download_done_outlined),
               onPressed: () => context.push('/downloads'),

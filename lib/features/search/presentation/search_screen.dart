@@ -8,6 +8,8 @@ import '../../../core/widgets/empty_view.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/manga_grid_card.dart';
 import '../../../core/widgets/skeleton.dart';
+import '../../manga/domain/entities/manga.dart';
+import '../../manga/domain/repositories/manga_repository.dart' show MangaFilter;
 import '../../manga/providers/manga_providers.dart';
 import '../../settings/presentation/settings_provider.dart';
 import 'search_provider.dart';
@@ -358,18 +360,19 @@ class _FilterBar extends ConsumerWidget {
     required this.onChanged,
   });
 
-  final dynamic filter;
+  final MangaFilter filter;
   final int tagCount;
   final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(searchFilterProvider.notifier);
-    final orderKey = filter.order.keys.first as String;
-    final statusVal = (filter.status as List).isEmpty
+    final orderKey = filter.order.keys.first;
+    final statusVal = filter.status.isEmpty
         ? ''
-        : (filter.status as List).first as String;
-    final year = filter.year as int?;
+        : filter.status.first;
+    final year = filter.year;
+    final currentOrigin = filter.origin;
     // Komiku: hanya 2 urutan didukung, tanpa filter tahun.
     final isKomiku = ref.watch(sourceProvider) == 'komiku';
     final orders = searchOrdersFor(isKomiku ? 'komiku' : 'mangadex');
@@ -379,6 +382,58 @@ class _FilterBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
+          // Filter Asal / Tipe Komik (Manga, Manhwa, Manhua, Semua)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: ChoiceChip(
+              label: const Text('Semua'),
+              selected: currentOrigin == null,
+              onSelected: (_) {
+                notifier.setOrigin(null);
+                onChanged();
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: ChoiceChip(
+              avatar: const Text('🇰🇷', style: TextStyle(fontSize: 12)),
+              label: const Text('Manhwa'),
+              selected: currentOrigin == MangaOrigin.kr,
+              onSelected: (_) {
+                notifier.setOrigin(currentOrigin == MangaOrigin.kr ? null : MangaOrigin.kr);
+                onChanged();
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: ChoiceChip(
+              avatar: const Text('🇯🇵', style: TextStyle(fontSize: 12)),
+              label: const Text('Manga'),
+              selected: currentOrigin == MangaOrigin.jp,
+              onSelected: (_) {
+                notifier.setOrigin(currentOrigin == MangaOrigin.jp ? null : MangaOrigin.jp);
+                onChanged();
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: ChoiceChip(
+              avatar: const Text('🇨🇳', style: TextStyle(fontSize: 12)),
+              label: const Text('Manhua'),
+              selected: currentOrigin == MangaOrigin.cn,
+              onSelected: (_) {
+                notifier.setOrigin(currentOrigin == MangaOrigin.cn ? null : MangaOrigin.cn);
+                onChanged();
+              },
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Text('•'),
+          ),
           for (final o in orders)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),

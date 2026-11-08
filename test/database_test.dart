@@ -17,7 +17,7 @@ void main() {
     final db = open();
     addTearDown(db.close);
     final s = await db.getSettings();
-    expect(s.theme, 'system');
+    expect(s.theme, 'dark');
     expect(s.chapterLang, 'id');
     expect(s.adultFilter, true);
     expect(s.source, 'komiku');

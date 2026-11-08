@@ -70,8 +70,18 @@ Manga mangaFromJson(Map<String, dynamic> j) {
   final statsRating = stats?['rating'];
   final bayesian = statsRating is Map ? statsRating['bayesian'] : null;
 
+  final origLang = attrs['originalLanguage']?.toString();
+  final origin = switch (origLang) {
+    'ja' => MangaOrigin.jp,
+    'ko' => MangaOrigin.kr,
+    'zh' || 'zh-hk' || 'zh-ro' => MangaOrigin.cn,
+    _ => MangaOrigin.fromTagsOrType(tags.map((t) => t.name).toList(), origLang),
+  };
+
   return Manga(
     id: id,
+    sourceId: 'mangadex',
+    origin: origin,
     title: _locale(attrs['title'] as Map?),
     altTitles: alts,
     description: desc.isEmpty ? null : desc,

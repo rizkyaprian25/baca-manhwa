@@ -18,20 +18,32 @@ void main() {
   test('mangaRowToEntity: decode tags & altTitles JSON', () {
     const row = Manga(
       id: 'abc',
+      source: 'komiku',
+      origin: 'other',
       title: 'Judul',
       altTitles: '["Alt 1","Alt 2"]',
       tags: '[{"id":"t1","name":"Action"},{"id":"t2","name":"Fantasy"}]',
     );
     final e = mangaRowToEntity(row);
     expect(e.id, 'abc');
+    expect(e.sourceId, 'komiku');
+    expect(e.origin, entity.MangaOrigin.other);
     expect(e.altTitles, ['Alt 1', 'Alt 2']);
     expect(e.tags.map((t) => t.name), ['Action', 'Fantasy']);
     expect(mangaRowTagIds(row), ['t1', 't2']);
   });
 
   test('mangaRowToEntity: JSON rusak tidak crash', () {
-    const row = Manga(id: 'x', title: 'Y', tags: 'bukan-json');
+    const row = Manga(
+      id: 'x',
+      source: 'mangadex',
+      origin: 'kr',
+      title: 'Y',
+      tags: 'bukan-json',
+    );
     final e = mangaRowToEntity(row);
+    expect(e.sourceId, 'mangadex');
+    expect(e.origin, entity.MangaOrigin.kr);
     expect(e.tags, isEmpty);
     expect(mangaRowTagIds(row), isEmpty);
   });
@@ -43,6 +55,24 @@ void main() {
     // Filter lain tidak ikut ke-reset saat set year.
     final g = f.copyWith(title: 'solo', year: 2020).copyWith(title: 'solo leveling');
     expect(g.year, 2020);
+  });
+
+  test('MangaFilter.copyWith: set & clear origin (JP Manga / KR Manhwa / CN Manhua)', () {
+    const f = MangaFilter();
+    expect(f.copyWith(origin: entity.MangaOrigin.jp).origin, entity.MangaOrigin.jp);
+    expect(f.copyWith(origin: entity.MangaOrigin.kr).origin, entity.MangaOrigin.kr);
+    expect(f.copyWith(origin: entity.MangaOrigin.cn).origin, entity.MangaOrigin.cn);
+    expect(f.copyWith(origin: entity.MangaOrigin.jp, clearOrigin: true).origin, isNull);
+  });
+
+  test('MangaOrigin parser: parsing kode dan deteksi tag', () {
+    expect(entity.MangaOrigin.fromCode('manga'), entity.MangaOrigin.jp);
+    expect(entity.MangaOrigin.fromCode('manhwa'), entity.MangaOrigin.kr);
+    expect(entity.MangaOrigin.fromCode('manhua'), entity.MangaOrigin.cn);
+    expect(entity.MangaOrigin.fromCode('unknown'), entity.MangaOrigin.other);
+    expect(entity.MangaOrigin.fromTagsOrType(['Action', 'Korean']), entity.MangaOrigin.kr);
+    expect(entity.MangaOrigin.fromTagsOrType(['Chinese']), entity.MangaOrigin.cn);
+    expect(entity.MangaOrigin.fromTagsOrType(['Japanese', 'Shounen']), entity.MangaOrigin.jp);
   });
 
   test('ContentRatingFilter: sensor ON/OFF', () {
@@ -177,7 +207,12 @@ void main() {
           page: 0,
           readAt: DateTime(2026, 1, id),
         ),
-        manga: Manga(id: mangaId, title: 'T$mangaId'),
+        manga: Manga(
+          id: mangaId,
+          source: 'komiku',
+          origin: 'kr',
+          title: 'T$mangaId',
+        ),
         chapter: mkChapter('c$id'),
       );
 

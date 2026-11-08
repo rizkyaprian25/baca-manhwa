@@ -31,6 +31,8 @@ e.Manga mangaRowToEntity(Manga row) {
   } catch (_) {}
   return e.Manga(
     id: row.id,
+    sourceId: row.source,
+    origin: e.MangaOrigin.fromCode(row.origin),
     title: row.title,
     altTitles: alts,
     description: row.description,
@@ -62,6 +64,8 @@ List<String> mangaRowTagIds(Manga row) {
 /// Entity -> Drift companion (dipakai semua repository).
 MangasCompanion mangaToCompanion(e.Manga m) => MangasCompanion(
       id: Value(m.id),
+      source: Value(m.sourceId),
+      origin: Value(m.origin.code),
       title: Value(m.title),
       altTitles: Value(jsonEncode(m.altTitles)),
       description: Value(m.description),

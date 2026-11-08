@@ -17,6 +17,26 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('komiku'),
+  );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('other'),
+  );
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
@@ -129,6 +149,8 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    source,
+    origin,
     title,
     altTitles,
     description,
@@ -157,6 +179,18 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
     }
     if (data.containsKey('title')) {
       context.handle(
@@ -248,6 +282,14 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      )!,
       title: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}title'],
@@ -303,6 +345,8 @@ class $MangasTable extends Mangas with TableInfo<$MangasTable, Manga> {
 
 class Manga extends DataClass implements Insertable<Manga> {
   final String id;
+  final String source;
+  final String origin;
   final String title;
   final String? altTitles;
   final String? description;
@@ -316,6 +360,8 @@ class Manga extends DataClass implements Insertable<Manga> {
   final DateTime? lastFetched;
   const Manga({
     required this.id,
+    required this.source,
+    required this.origin,
     required this.title,
     this.altTitles,
     this.description,
@@ -332,6 +378,8 @@ class Manga extends DataClass implements Insertable<Manga> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['source'] = Variable<String>(source);
+    map['origin'] = Variable<String>(origin);
     map['title'] = Variable<String>(title);
     if (!nullToAbsent || altTitles != null) {
       map['alt_titles'] = Variable<String>(altTitles);
@@ -369,6 +417,8 @@ class Manga extends DataClass implements Insertable<Manga> {
   MangasCompanion toCompanion(bool nullToAbsent) {
     return MangasCompanion(
       id: Value(id),
+      source: Value(source),
+      origin: Value(origin),
       title: Value(title),
       altTitles: altTitles == null && nullToAbsent
           ? const Value.absent()
@@ -406,6 +456,8 @@ class Manga extends DataClass implements Insertable<Manga> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Manga(
       id: serializer.fromJson<String>(json['id']),
+      source: serializer.fromJson<String>(json['source']),
+      origin: serializer.fromJson<String>(json['origin']),
       title: serializer.fromJson<String>(json['title']),
       altTitles: serializer.fromJson<String?>(json['altTitles']),
       description: serializer.fromJson<String?>(json['description']),
@@ -424,6 +476,8 @@ class Manga extends DataClass implements Insertable<Manga> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'source': serializer.toJson<String>(source),
+      'origin': serializer.toJson<String>(origin),
       'title': serializer.toJson<String>(title),
       'altTitles': serializer.toJson<String?>(altTitles),
       'description': serializer.toJson<String?>(description),
@@ -440,6 +494,8 @@ class Manga extends DataClass implements Insertable<Manga> {
 
   Manga copyWith({
     String? id,
+    String? source,
+    String? origin,
     String? title,
     Value<String?> altTitles = const Value.absent(),
     Value<String?> description = const Value.absent(),
@@ -453,6 +509,8 @@ class Manga extends DataClass implements Insertable<Manga> {
     Value<DateTime?> lastFetched = const Value.absent(),
   }) => Manga(
     id: id ?? this.id,
+    source: source ?? this.source,
+    origin: origin ?? this.origin,
     title: title ?? this.title,
     altTitles: altTitles.present ? altTitles.value : this.altTitles,
     description: description.present ? description.value : this.description,
@@ -470,6 +528,8 @@ class Manga extends DataClass implements Insertable<Manga> {
   Manga copyWithCompanion(MangasCompanion data) {
     return Manga(
       id: data.id.present ? data.id.value : this.id,
+      source: data.source.present ? data.source.value : this.source,
+      origin: data.origin.present ? data.origin.value : this.origin,
       title: data.title.present ? data.title.value : this.title,
       altTitles: data.altTitles.present ? data.altTitles.value : this.altTitles,
       description: data.description.present
@@ -494,6 +554,8 @@ class Manga extends DataClass implements Insertable<Manga> {
   String toString() {
     return (StringBuffer('Manga(')
           ..write('id: $id, ')
+          ..write('source: $source, ')
+          ..write('origin: $origin, ')
           ..write('title: $title, ')
           ..write('altTitles: $altTitles, ')
           ..write('description: $description, ')
@@ -512,6 +574,8 @@ class Manga extends DataClass implements Insertable<Manga> {
   @override
   int get hashCode => Object.hash(
     id,
+    source,
+    origin,
     title,
     altTitles,
     description,
@@ -529,6 +593,8 @@ class Manga extends DataClass implements Insertable<Manga> {
       identical(this, other) ||
       (other is Manga &&
           other.id == this.id &&
+          other.source == this.source &&
+          other.origin == this.origin &&
           other.title == this.title &&
           other.altTitles == this.altTitles &&
           other.description == this.description &&
@@ -544,6 +610,8 @@ class Manga extends DataClass implements Insertable<Manga> {
 
 class MangasCompanion extends UpdateCompanion<Manga> {
   final Value<String> id;
+  final Value<String> source;
+  final Value<String> origin;
   final Value<String> title;
   final Value<String?> altTitles;
   final Value<String?> description;
@@ -558,6 +626,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   final Value<int> rowid;
   const MangasCompanion({
     this.id = const Value.absent(),
+    this.source = const Value.absent(),
+    this.origin = const Value.absent(),
     this.title = const Value.absent(),
     this.altTitles = const Value.absent(),
     this.description = const Value.absent(),
@@ -573,6 +643,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   });
   MangasCompanion.insert({
     required String id,
+    this.source = const Value.absent(),
+    this.origin = const Value.absent(),
     required String title,
     this.altTitles = const Value.absent(),
     this.description = const Value.absent(),
@@ -589,6 +661,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
        title = Value(title);
   static Insertable<Manga> custom({
     Expression<String>? id,
+    Expression<String>? source,
+    Expression<String>? origin,
     Expression<String>? title,
     Expression<String>? altTitles,
     Expression<String>? description,
@@ -604,6 +678,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (source != null) 'source': source,
+      if (origin != null) 'origin': origin,
       if (title != null) 'title': title,
       if (altTitles != null) 'alt_titles': altTitles,
       if (description != null) 'description': description,
@@ -621,6 +697,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
 
   MangasCompanion copyWith({
     Value<String>? id,
+    Value<String>? source,
+    Value<String>? origin,
     Value<String>? title,
     Value<String?>? altTitles,
     Value<String?>? description,
@@ -636,6 +714,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   }) {
     return MangasCompanion(
       id: id ?? this.id,
+      source: source ?? this.source,
+      origin: origin ?? this.origin,
       title: title ?? this.title,
       altTitles: altTitles ?? this.altTitles,
       description: description ?? this.description,
@@ -656,6 +736,12 @@ class MangasCompanion extends UpdateCompanion<Manga> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -700,6 +786,8 @@ class MangasCompanion extends UpdateCompanion<Manga> {
   String toString() {
     return (StringBuffer('MangasCompanion(')
           ..write('id: $id, ')
+          ..write('source: $source, ')
+          ..write('origin: $origin, ')
           ..write('title: $title, ')
           ..write('altTitles: $altTitles, ')
           ..write('description: $description, ')
@@ -2557,7 +2645,7 @@ class $AppSettingsTable extends AppSettings
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('system'),
+    defaultValue: const Constant('dark'),
   );
   static const VerificationMeta _chapterLangMeta = const VerificationMeta(
     'chapterLang',
@@ -3214,6 +3302,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$MangasTableCreateCompanionBuilder =
     MangasCompanion Function({
       required String id,
+      Value<String> source,
+      Value<String> origin,
       required String title,
       Value<String?> altTitles,
       Value<String?> description,
@@ -3230,6 +3320,8 @@ typedef $$MangasTableCreateCompanionBuilder =
 typedef $$MangasTableUpdateCompanionBuilder =
     MangasCompanion Function({
       Value<String> id,
+      Value<String> source,
+      Value<String> origin,
       Value<String> title,
       Value<String?> altTitles,
       Value<String?> description,
@@ -3333,6 +3425,16 @@ class $$MangasTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3506,6 +3608,16 @@ class $$MangasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get title => $composableBuilder(
     column: $table.title,
     builder: (column) => ColumnOrderings(column),
@@ -3573,6 +3685,12 @@ class $$MangasTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
 
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
@@ -3748,6 +3866,8 @@ class $$MangasTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<String> origin = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String?> altTitles = const Value.absent(),
                 Value<String?> description = const Value.absent(),
@@ -3762,6 +3882,8 @@ class $$MangasTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => MangasCompanion(
                 id: id,
+                source: source,
+                origin: origin,
                 title: title,
                 altTitles: altTitles,
                 description: description,
@@ -3778,6 +3900,8 @@ class $$MangasTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<String> source = const Value.absent(),
+                Value<String> origin = const Value.absent(),
                 required String title,
                 Value<String?> altTitles = const Value.absent(),
                 Value<String?> description = const Value.absent(),
@@ -3792,6 +3916,8 @@ class $$MangasTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => MangasCompanion.insert(
                 id: id,
+                source: source,
+                origin: origin,
                 title: title,
                 altTitles: altTitles,
                 description: description,

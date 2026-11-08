@@ -7,7 +7,7 @@ class AppConstants {
   static const String locale = 'id_ID';
 
   /// Versi skema Drift — naikkan tiap ada perubahan tabel + tulis migrasi.
-  static const int dbVersion = 5;
+  static const int dbVersion = 6;
   static const String dbName = 'baca_manhwa.db';
 
   // --- MangaDex ---

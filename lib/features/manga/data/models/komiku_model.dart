@@ -122,8 +122,12 @@ Manga _listItem(Element el) {
   if (metaParts.length >= 2 && metaParts[1].isNotEmpty) {
     ago = metaParts[1];
   }
+  final typeText = el.querySelector('.tpe1_inf b')?.text.trim();
+  final origin = MangaOrigin.fromCode(typeText);
   return Manga(
     id: 'k:$slug',
+    sourceId: 'komiku',
+    origin: origin,
     title: title,
     description: desc.isEmpty ? null : desc,
     coverUrl: img?.attributes['src'],
@@ -229,8 +233,12 @@ DateTime? _parseIdDate(String raw) {
       ),
     );
   }
+  final rawType = _tableValue(root, 'Tipe:');
+  final origin = MangaOrigin.fromCode(rawType);
   final manga = Manga(
     id: 'k:$slug',
+    sourceId: 'komiku',
+    origin: origin,
     title: name,
     altTitles: (alt == null || alt.isEmpty || alt == name) ? const [] : [alt],
     description: (desc == null || desc.isEmpty) ? null : desc,

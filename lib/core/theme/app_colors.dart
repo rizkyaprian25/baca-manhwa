@@ -5,33 +5,33 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Brand (dark)
-  static const Color primary = Color(0xFFD0BCFF);
-  static const Color onPrimary = Color(0xFF3C0091);
-  static const Color primaryContainer = Color(0xFFA078FF);
-  static const Color onPrimaryContainer = Color(0xFF340080);
-  static const Color inversePrimary = Color(0xFF6D3BD7);
+  // Brand (dark) — Apple iOS System Blue & KuroYomi Liquid Glass
+  static const Color primary = Color(0xFF0A84FF);
+  static const Color onPrimary = Color(0xFFFFFFFF);
+  static const Color primaryContainer = Color(0xFF1A385C);
+  static const Color onPrimaryContainer = Color(0xFFD0E2FF);
+  static const Color inversePrimary = Color(0xFF0062D2);
 
-  static const Color secondary = Color(0xFF4EDEA3);
-  static const Color onSecondary = Color(0xFF003824);
+  static const Color secondary = Color(0xFFFF9F0A);
+  static const Color onSecondary = Color(0xFF452B00);
   static const Color secondaryContainer = Color(0xFF00A572);
 
-  static const Color tertiary = Color(0xFF7BD0FF);
+  static const Color tertiary = Color(0xFF30D158);
   static const Color tertiaryContainer = Color(0xFF009BD1);
 
-  static const Color error = Color(0xFFFFB4AB);
-  static const Color onError = Color(0xFF690005);
+  static const Color error = Color(0xFFFF453A);
+  static const Color onError = Color(0xFFFFFFFF);
 
-  // Dark surfaces
-  static const Color darkSurface = Color(0xFF0F131C);
-  static const Color darkOnSurface = Color(0xFFDFE2EE);
-  static const Color darkOnSurfaceVariant = Color(0xFFCBC3D7);
-  static const Color darkSurfaceLowest = Color(0xFF0A0E16);
-  static const Color darkSurfaceLow = Color(0xFF181C24);
-  static const Color darkSurfaceContainer = Color(0xFF1C2028);
-  static const Color darkSurfaceHigh = Color(0xFF262A33);
-  static const Color darkSurfaceBright = Color(0xFF353942);
-  static const Color darkOutline = Color(0xFF958EA0);
+  // Dark surfaces (Obsidian Graphite KuroYomi)
+  static const Color darkSurface = Color(0xFF0B0C10);
+  static const Color darkOnSurface = Color(0xFFF5F5F7);
+  static const Color darkOnSurfaceVariant = Color(0xFF8E8E93);
+  static const Color darkSurfaceLowest = Color(0xFF060709);
+  static const Color darkSurfaceLow = Color(0xFF101218);
+  static const Color darkSurfaceContainer = Color(0xFF16181F);
+  static const Color darkSurfaceHigh = Color(0xFF1E202B);
+  static const Color darkSurfaceBright = Color(0xFF282C3A);
+  static const Color darkOutline = Color(0xFF3A3F50);
 
   // Light — biru MangaIndo
   static const Color lightPrimary = Color(0xFF2F80D6);
@@ -51,9 +51,9 @@ class AppColors {
   static const Color langEnBadge = Color(0xFF009BD1);
 
   // Liquid Glass Tokens (Apple HIG Translucency)
-  static const Color glassDarkFill = Color(0xB812151D);
-  static const Color glassDarkBorder = Color(0x1FFFFFFF);
-  static const Color glassLightFill = Color(0xD6FFFFFF);
+  static const Color glassDarkFill = Color(0xE016181F);
+  static const Color glassDarkBorder = Color(0x1AFFFFFF);
+  static const Color glassLightFill = Color(0xE0FFFFFF);
   static const Color glassLightBorder = Color(0x14000000);
 
   static const ColorScheme darkScheme = ColorScheme(

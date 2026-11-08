@@ -40,7 +40,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     with SingleTickerProviderStateMixin {
   late String _mode;
   bool _amoled = false;
-  bool _showChrome = true;
+  bool _showChrome = false;
   bool _tapNav = true;
   bool _missing = false;
   bool _resumeAsked = false;
@@ -511,10 +511,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           if (_autoScrolling) _floatingAutoScrollHud(),
           if (_showChrome) ...[
             _topHud(),
-            _pagePill(),
             _bottomController(),
           ] else ...[
-            _pagePill(),
+            _subtleCleanReaderFooter(),
           ],
         ],
       ),
@@ -655,164 +654,291 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  /// Pil penghitung halaman (selalu terlihat).
-  Widget _pagePill() {
-    final scheme = Theme.of(context).colorScheme;
-    final pillBottom = _showChrome ? 316.0 : (_autoScrolling ? 88.0 : 24.0);
+  /// Indikator halus pojok bawah saat chrome tertutup (0% mengganggu artwork).
+  Widget _subtleCleanReaderFooter() {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Positioned(
+      left: 16,
       right: 16,
-      bottom: pillBottom,
+      bottom: bottomInset > 0 ? bottomInset + 4 : 8,
       child: IgnorePointer(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHigh.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: scheme.secondary,
-                  shape: BoxShape.circle,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            ValueListenableBuilder<int>(
+              valueListenable: _page,
+              builder: (_, p, _) => Text(
+                _chapter == null || _total <= 0
+                    ? ''
+                    : 'Ch. ${_chapter!.chapterNo ?? ""} • Hal. ${p + 1}/$_total',
+                style: const TextStyle(
+                  color: Color(0x66FFFFFF),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  shadows: [
+                    Shadow(color: Colors.black54, blurRadius: 4),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
-              ValueListenableBuilder<int>(
-                valueListenable: _page,
-                builder: (_, p, _) => Text(
-                  _total <= 0 ? '...' : '${p + 1} / $_total',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+            ),
+            const Text(
+              'Ketuk tengah untuk menu',
+              style: TextStyle(
+                color: Color(0x40FFFFFF),
+                fontSize: 10,
+                shadows: [
+                  Shadow(color: Colors.black54, blurRadius: 4),
+                ],
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Kapsul Navigasi Bawah Terpadu (Liquid Glass Floating Capsule).
+  /// Menggabungkan Scrubber Halaman + Tombol Ch. Prev, Daftar Chapter, Unduh, Ch. Next
+  /// dalam satu kesatuan anggun tanpa tombol melayang di atas panel manga.
+  Widget _bottomController() {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Positioned(
+      left: 12,
+      right: 12,
+      bottom: bottomInset > 0 ? bottomInset + 8 : 16,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xE016181F) : const Color(0xE0FFFFFF),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isDark ? const Color(0x1AFFFFFF) : const Color(0x14000000),
+                width: 0.75,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x4D000000),
+                  offset: Offset(0, 8),
+                  blurRadius: 24,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Row 1: Scrubber progress halaman
+                Row(
+                  children: [
+                    ValueListenableBuilder<int>(
+                      valueListenable: _page,
+                      builder: (_, p, _) => Text(
+                        _total <= 0 ? '1' : '${p + 1}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ValueListenableBuilder<int>(
+                        valueListenable: _page,
+                        builder: (_, p, _) => SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                          ),
+                          child: Slider(
+                            min: 1,
+                            max: _total <= 0 ? 1 : _total.toDouble(),
+                            divisions: _total <= 1 ? 1 : _total - 1,
+                            value: _total <= 0
+                                ? 1
+                                : (p + 1).clamp(1, _total).toDouble(),
+                            onChanged: (v) => _sliderJump(v.round() - 1),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _total <= 0 ? '...' : '$_total',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Row 2: Kontrol navigasi bab terpadu (Prev, Daftar, Unduh, Next)
+                Row(
+                  children: [
+                    // Tombol Bab Sebelumnya
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          side: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.black12,
+                            width: 0.5,
+                          ),
+                        ),
+                        onPressed: _prevChapter == null
+                            ? null
+                            : () => _goChapter(_prevChapter!.id),
+                        child: Text(
+                          _prevChapter == null
+                              ? '◀ Awal'
+                              : '◀ Ch. ${_prevChapter!.chapterNo ?? ""}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // Tombol Daftar Bab (Modal Sheet)
+                    IconButton.filledTonal(
+                      tooltip: 'Daftar Bab',
+                      icon: const Icon(Icons.format_list_bulleted, size: 18),
+                      style: IconButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _openChapterListSheet,
+                    ),
+                    const SizedBox(width: 4),
+                    // Tombol Unduh Bab Aktif
+                    IconButton.filledTonal(
+                      tooltip: 'Unduh Bab Ini',
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      style: IconButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _downloadCurrentChapter,
+                    ),
+                    const SizedBox(width: 6),
+                    // Tombol Bab Selanjutnya (Primary Accent Button)
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _nextChapter == null
+                            ? null
+                            : () => _goChapter(_nextChapter!.id),
+                        child: Text(
+                          _nextChapter == null
+                              ? 'Akhir ▶'
+                              : 'Ch. ${_nextChapter!.chapterNo ?? ""} ▶',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Controller bawah: slider + navigasi + tile cepat + badge.
-  Widget _bottomController() {
-    final scheme = Theme.of(context).colorScheme;
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: SafeArea(
-        top: false,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              color: scheme.surfaceContainerHigh.withValues(alpha: 0.95),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+  Future<void> _openChapterListSheet() {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.85,
+          minChildSize: 0.4,
+          expand: false,
+          builder: (context, scrollCtrl) {
+            return Column(
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
+                      const Icon(Icons.format_list_bulleted, size: 20),
+                      const SizedBox(width: 8),
                       Text(
-                        'Kemajuan Membaca',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const Spacer(),
-                      ValueListenableBuilder<int>(
-                        valueListenable: _page,
-                        builder: (_, p, _) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: scheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            _total <= 0
-                                ? '...'
-                                : '${(((p + 1) / _total) * 100).round()}%',
-                            style: TextStyle(
-                              color: scheme.onPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
+                        'Daftar Bab (${_siblings.length})',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                     ],
                   ),
-                  ValueListenableBuilder<int>(
-                    valueListenable: _page,
-                    builder: (_, p, _) => Slider(
-                      min: 1,
-                      max: _total <= 0 ? 1 : _total.toDouble(),
-                      divisions: _total <= 1 ? 1 : _total - 1,
-                      value: _total <= 0
-                          ? 1
-                          : (p + 1).clamp(1, _total).toDouble(),
-                      onChanged: (v) => _sliderJump(v.round() - 1),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          icon: const Icon(Icons.fast_rewind),
-                          label: Text(
-                            _prevChapter == null
-                                ? 'Awal'
-                                : _chapterLabel(_prevChapter!),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    itemCount: _siblings.length,
+                    itemBuilder: (_, i) {
+                      final c = _siblings[i];
+                      final isCurrent = c.id == _chapter?.id;
+                      return ListTile(
+                        selected: isCurrent,
+                        title: Text(
+                          c.title?.isNotEmpty == true
+                              ? 'Ch. ${c.chapterNo} - ${c.title}'
+                              : 'Chapter ${c.chapterNo}',
+                          style: TextStyle(
+                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                           ),
-                          onPressed: _prevChapter == null
-                              ? null
-                              : () => _goChapter(_prevChapter!.id),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        icon: Icon(
-                          _autoScrolling ? Icons.pause : Icons.play_arrow,
-                        ),
-                        label: Text(
-                          _autoScrolling ? 'Jeda' : 'Scroll Otomatis',
-                        ),
-                        onPressed: _mode == 'vertical'
-                            ? _toggleAutoScroll
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          icon: const Icon(Icons.fast_forward),
-                          label: Text(
-                            _nextChapter == null
-                                ? 'Akhir'
-                                : _chapterLabel(_nextChapter!),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        subtitle: Text(
+                          c.isRead ? 'Telah dibaca' : 'Belum dibaca',
+                          style: TextStyle(
+                            color: c.isRead ? Colors.green : Colors.grey,
+                            fontSize: 11,
                           ),
-                          onPressed: _nextChapter == null
-                              ? null
-                              : () => _goChapter(_nextChapter!.id),
                         ),
-                      ),
-                    ],
+                        trailing: isCurrent ? const Icon(Icons.check, color: Colors.blue) : null,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          if (!isCurrent) _goChapter(c.id);
+                        },
+                      );
+                    },
                   ),
-                  const SizedBox(height: 4),
-                ],
-              ),
-            ),
-          ),
-        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _downloadCurrentChapter() {
+    if (_chapter == null) return;
+    ref.read(downloadManagerProvider).enqueue(_chapter!.mangaId, _chapter!.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Mengunduh ${_chapterLabel(_chapter!)}...'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

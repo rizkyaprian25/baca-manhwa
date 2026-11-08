@@ -93,17 +93,29 @@ class KomikuRepositoryImpl implements MangaRepository {
     return all.skip(skip).take(limit).toList();
   }
 
+  static String? _originToTipe(MangaOrigin? origin) {
+    if (origin == null) return null;
+    return switch (origin) {
+      MangaOrigin.jp => 'manga',
+      MangaOrigin.kr => 'manhwa',
+      MangaOrigin.cn => 'manhua',
+      MangaOrigin.other => null,
+    };
+  }
+
   @override
   Future<MangaPage> search(
     MangaFilter filter, {
     int limit = 20,
     int offset = 0,
   }) async {
+    final tipe = _originToTipe(filter.origin);
+
     // 1. Pencarian teks / judul komik
     if (filter.title.trim().isNotEmpty) {
       final q = filter.title.trim();
       final items = await _fetchRange(
-        fetchPage: (p) => remote.searchPage(q, page: p),
+        fetchPage: (p) => remote.searchPage(q, tipe: tipe, page: p),
         offset: offset,
         limit: limit,
       );
@@ -143,6 +155,7 @@ class KomikuRepositoryImpl implements MangaRepository {
         orderby: orderby,
         genre: genre,
         genre2: genre2,
+        tipe: tipe,
         page: p,
       ),
       offset: offset,

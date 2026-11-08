@@ -1,5 +1,50 @@
 // Entity domain dipakai lintas fitur (home/search/detail/reader/library/history).
 
+import '../../../../core/sources/source_id.dart';
+
+/// Asal negara komik beserta representasi visual & label tipe.
+enum MangaOrigin {
+  jp('jp', 'Jepang', 'Manga', '🇯🇵'),
+  kr('kr', 'Korea', 'Manhwa', '🇰🇷'),
+  cn('cn', 'China', 'Manhua', '🇨🇳'),
+  other('other', 'Lainnya', 'Komik', '🌐');
+
+  const MangaOrigin(this.code, this.countryName, this.typeLabel, this.flagEmoji);
+  final String code;
+  final String countryName;
+  final String typeLabel;
+  final String flagEmoji;
+
+  static MangaOrigin fromCode(String? code) {
+    if (code == null) return MangaOrigin.other;
+    return switch (code.toLowerCase().trim()) {
+      'jp' || 'manga' || 'japan' || 'japanese' => MangaOrigin.jp,
+      'kr' || 'manhwa' || 'korea' || 'korean' => MangaOrigin.kr,
+      'cn' || 'manhua' || 'china' || 'chinese' => MangaOrigin.cn,
+      _ => MangaOrigin.other,
+    };
+  }
+
+  /// Deteksi asal dari kumpulan tag genre atau tipe mentah.
+  static MangaOrigin fromTagsOrType(List<String> tags, [String? typeString]) {
+    if (typeString != null && typeString.isNotEmpty) {
+      final parsed = fromCode(typeString);
+      if (parsed != MangaOrigin.other) return parsed;
+    }
+    final lowerTags = tags.map((t) => t.toLowerCase().trim()).toSet();
+    if (lowerTags.contains('manhwa') || lowerTags.contains('korean')) {
+      return MangaOrigin.kr;
+    }
+    if (lowerTags.contains('manhua') || lowerTags.contains('chinese')) {
+      return MangaOrigin.cn;
+    }
+    if (lowerTags.contains('manga') || lowerTags.contains('japanese')) {
+      return MangaOrigin.jp;
+    }
+    return MangaOrigin.other;
+  }
+}
+
 class MangaTag {
   MangaTag({required this.id, required this.name});
   final String id;
@@ -10,6 +55,8 @@ class Manga {
   Manga({
     required this.id,
     required this.title,
+    String? sourceId,
+    this.origin = MangaOrigin.other,
     this.altTitles = const [],
     this.description,
     this.status,
@@ -23,9 +70,11 @@ class Manga {
     this.rating,
     this.latestChapter,
     this.updateAgo,
-  });
+  }) : sourceId = sourceId ?? SourceId.fromMangaId(id);
 
   final String id;
+  final String sourceId;
+  final MangaOrigin origin;
   final String title;
   final List<String> altTitles;
   final String? description;

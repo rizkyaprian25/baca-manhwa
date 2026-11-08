@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../features/manga/domain/entities/manga.dart';
 import '../../features/library/presentation/library_actions.dart';
 import '../utils/number_formatter.dart';
+import 'apple_bounce_tap.dart';
 import 'cover_image.dart';
+import 'origin_flag_badge.dart';
 
 /// Kartu hasil Jelajah ala contoh: cover portrait + badge (UP/16+/flag)
 /// + judul + rating/views + baris chapter.
@@ -15,16 +17,16 @@ class MangaGridCard extends ConsumerWidget {
   const MangaGridCard({super.key, required this.manga});
   final Manga manga;
 
-  bool get _isKomiku => manga.id.startsWith('k:');
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
+    return AppleBounceTap(
       onTap: () => context.push('/manga/${manga.id}'),
-      onLongPress: () => showMangaQuickActions(context, ref, manga),
-      child: Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => context.push('/manga/${manga.id}'),
+        onLongPress: () => showMangaQuickActions(context, ref, manga),
+        child: Card(
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.zero,
         child: Column(
@@ -58,11 +60,11 @@ class MangaGridCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (_isKomiku)
-                    const Positioned(
+                  if (manga.origin != MangaOrigin.other)
+                    Positioned(
                       top: 6,
                       right: 6,
-                      child: _FlagKr(),
+                      child: OriginFlagBadge(origin: manga.origin),
                     ),
                 ],
               ),
@@ -93,8 +95,9 @@ class MangaGridCard extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Badge umur untuk konten sensitif (data MangaDex).
   String? get _ageBadge => switch (manga.contentRating) {
@@ -181,31 +184,6 @@ class MangaGridCard extends ConsumerWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Bendera Korea (konten Komiku = manhwa) — lingkaran belah merah/biru.
-class _FlagKr extends StatelessWidget {
-  const _FlagKr();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-      ),
-      child: ClipOval(
-        child: Column(
-          children: [
-            Expanded(child: Container(color: const Color(0xFFCD2E3A))),
-            Expanded(child: Container(color: const Color(0xFF0047A0))),
-          ],
-        ),
       ),
     );
   }

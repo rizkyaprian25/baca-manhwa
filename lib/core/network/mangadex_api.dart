@@ -28,6 +28,7 @@ class MangadexApi {
     int offset = 0,
     List<String> includes = defaultIncludes,
     List<String>? translatedLanguage,
+    List<String>? originalLanguage,
   }) async {
     final params = <String, dynamic>{
       'limit': limit,
@@ -50,6 +51,9 @@ class MangadexApi {
       for (final e in order.entries) {
         params['order[${e.key}]'] = e.value;
       }
+    }
+    if (originalLanguage != null && originalLanguage.isNotEmpty) {
+      params['originalLanguage[]'] = originalLanguage;
     }
     if (translatedLanguage != null && translatedLanguage.isNotEmpty) {
       params['availableTranslatedLanguage[]'] = translatedLanguage;

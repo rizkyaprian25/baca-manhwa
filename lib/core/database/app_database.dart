@@ -61,6 +61,18 @@ class AppDatabase extends _$AppDatabase {
               "UPDATE app_settings SET theme = 'dark' WHERE theme = 'system'",
             );
           }
+          if (from < 6) {
+            // Fase 27 (v1.1): Multi-sumber & deteksi negara asal (origin).
+            await m.addColumn(mangas, mangas.source);
+            await m.addColumn(mangas, mangas.origin);
+            // Backfill otomatis data lama berdasarkan format ID
+            await customStatement(
+              "UPDATE mangas SET source = 'komiku' WHERE id LIKE 'k:%'",
+            );
+            await customStatement(
+              "UPDATE mangas SET source = 'mangadex' WHERE id NOT LIKE 'k:%'",
+            );
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -75,6 +87,8 @@ class AppDatabase extends _$AppDatabase {
       'CREATE INDEX IF NOT EXISTS idx_library_opened ON library_entries (last_opened)',
       'CREATE INDEX IF NOT EXISTS idx_history_read ON reading_history (read_at)',
       'CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads (status)',
+      'CREATE INDEX IF NOT EXISTS idx_mangas_source ON mangas (source)',
+      'CREATE INDEX IF NOT EXISTS idx_mangas_origin ON mangas (origin)',
     ]) {
       await customStatement(sql);
     }

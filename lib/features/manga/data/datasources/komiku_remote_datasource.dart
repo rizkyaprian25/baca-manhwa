@@ -25,6 +25,7 @@ class KomikuRemoteDataSource {
     String? genre,
     String? genre2,
     String? status,
+    String? tipe,
     int page = 1,
   }) =>
       _guard(() async {
@@ -34,14 +35,19 @@ class KomikuRemoteDataSource {
           genre: genre,
           genre2: genre2,
           status: status,
+          tipe: tipe,
           page: page,
         );
         return k.komikuListFromHtml(html);
       });
 
-  Future<List<Manga>> searchPage(String query, {int page = 1}) =>
+  Future<List<Manga>> searchPage(
+    String query, {
+    String? tipe,
+    int page = 1,
+  }) =>
       _guard(() async {
-        final html = await _api.searchPage(query, page: page);
+        final html = await _api.searchPage(query, tipe: tipe, page: page);
         return k.komikuListFromHtml(html);
       });
 
