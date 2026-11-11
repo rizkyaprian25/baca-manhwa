@@ -625,6 +625,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                           onPressed: _bookmarkPage,
                         ),
                         IconButton(
+                          tooltip: _mode == 'vertical'
+                              ? (_autoScrolling
+                                  ? 'Jeda scroll otomatis'
+                                  : 'Scroll otomatis')
+                              : 'Scroll otomatis (hanya mode vertikal)',
+                          icon: Icon(
+                            _autoScrolling
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            color: _autoScrolling ? scheme.primary : null,
+                          ),
+                          onPressed: _mode == 'vertical'
+                              ? () {
+                                  _toggleAutoScroll();
+                                  if (_autoScrolling) {
+                                    setState(() => _showChrome = false);
+                                  }
+                                }
+                              : null,
+                        ),
+                        IconButton(
                           tooltip: 'Pengaturan baca',
                           icon: const Icon(Icons.tune),
                           onPressed: _openReaderSettings,
